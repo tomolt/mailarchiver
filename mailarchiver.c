@@ -6,7 +6,12 @@
 
 #include <dirent.h>
 #include <errno.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <strings.h>
 
+#if 0
 struct mailpart {
 	char *mimetype;
 	char *name; /* TODO rename this field */
@@ -22,6 +27,7 @@ struct mail {
 	size_t nparts;
 	struct mailpart *parts;
 };
+#endif
 
 void
 die(const char *format, ...)
@@ -34,18 +40,81 @@ die(const char *format, ...)
 	exit(1);
 }
 
-#if 0
-bool
-parse_header()
+static inline bool
+is_ws(char c)
 {
+	/* TODO */
+	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
+}
+
+static inline bool
+is_key(char c)
+{
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
+}
+
+/* TODO comment stripping function */
+
+void
+normalize_ws(char *str)
+{
+	char *rhead, *whead;
+	bool inws;
+
+	rhead = whead = str;
+	inws = true;
+	while (*rhead) {
+		if (is_ws(*rhead)) {
+			if (!inws) inws = true, *whead++ = ' ';
+		} else {
+			inws = false, *whead++ = *rhead;
+		}
+		rhead++;
+	}
+	if (inws) --whead;
+	*whead = '\0';
 }
 
 bool
-parse_mail(bool (*header_cb)())
+print_field(char *key, char *value)
 {
-
+	normalize_ws(value);
+	printf("%s is %s\n", key, value);
+	return true;
 }
-#endif
+
+bool
+parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
+{
+	char *cursor = *pointer;
+	char *key, *value;
+
+	for (;;) {
+		if (!*cursor) return false;
+		if (*cursor == '\n') break;
+
+		if (!is_key(*cursor)) return false;
+		key = cursor;
+		do cursor++; while (is_key(*cursor));
+		if (*cursor != ':') return false;
+		*cursor++ = '\0';
+
+		value = cursor;
+		do {
+			while (*cursor != '\n') {
+				if (!*cursor) return false;
+				cursor++;
+			}
+			cursor++;
+		} while (is_ws(*cursor) && *cursor != '\n');
+		*(cursor-1) = '\0';
+
+		if (!field_cb(key, value)) return false;
+	}
+
+	*pointer = cursor;
+	return true;
+}
 
 void
 process_inbox(const char *dirname)
@@ -58,7 +127,26 @@ process_inbox(const char *dirname)
 
 	while ((errno = 0, ent = readdir(dir))) {
 		if (ent->d_name[0] == '.') continue;
-		printf("%s\n", ent->d_name);
+		printf("Regarding file %s:\n", ent->d_name);
+
+		/* FIXME concat dirname with ent name */
+		/* TODO error checking */
+		int fd = open(ent->d_name, O_RDONLY);
+		struct stat meta;
+		fstat(fd, &meta);
+		char *content = malloc(meta.st_size + 1);
+		read(fd, content, meta.st_size);
+		content[meta.st_size] = '\0';
+		close(fd);
+		
+		char *pointer = content;
+		if (!parse_header(&pointer, print_field)) {
+			printf("can't parse header\n");
+		}
+
+		free(content);
+
+		printf("\n\n\n");
 	}
 	if (errno) die("readdir(\"%s\"): %s", dirname, strerror(errno));
 
