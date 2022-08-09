@@ -78,8 +78,15 @@ normalize_ws(char *str)
 bool
 print_field(char *key, char *value)
 {
-	normalize_ws(value);
-	printf("%s is %s\n", key, value);
+	if (!strcasecmp(key, "From") ||
+	    !strcasecmp(key, "To") ||
+	    !strcasecmp(key, "Subject") ||
+	    !strcasecmp(key, "Date") ||
+	    !strcasecmp(key, "Content-Type") ||
+	    !strcasecmp(key, "Content-Encoding")) {
+		normalize_ws(value);
+		printf("%s is %s\n", key, value);
+	}
 	return true;
 }
 
