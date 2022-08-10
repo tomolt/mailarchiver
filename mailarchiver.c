@@ -4,30 +4,10 @@
 #include <stdbool.h>
 #include <stdarg.h>
 
-#include <dirent.h>
-#include <errno.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <strings.h>
-
-#if 0
-struct mailpart {
-	char *mimetype;
-	char *name; /* TODO rename this field */
-	size_t length;
-	char *data;
-};
-
-struct mail {
-	char *uniq;
-	char *author;
-	char *title;
-	char *date;
-	size_t nparts;
-	struct mailpart *parts;
-};
-#endif
 
 void
 die(const char *format, ...)
@@ -53,8 +33,6 @@ is_key(char c)
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
 }
 
-/* TODO comment stripping function */
-
 void
 normalize_ws(char *str)
 {
@@ -79,13 +57,15 @@ bool
 print_field(char *key, char *value)
 {
 	if (!strcasecmp(key, "From") ||
-	    !strcasecmp(key, "To") ||
 	    !strcasecmp(key, "Subject") ||
 	    !strcasecmp(key, "Date") ||
+	    !strcasecmp(key, "Message-ID") ||
+	    !strcasecmp(key, "References") ||
+	    !strcasecmp(key, "In-Reply-To") ||
 	    !strcasecmp(key, "Content-Type") ||
-	    !strcasecmp(key, "Content-Encoding")) {
+	    !strcasecmp(key, "Content-Transfer-Encoding")) {
 		normalize_ws(value);
-		printf("%s is %s\n", key, value);
+		fprintf(stderr, "%s is %s\n", key, value);
 	}
 	return true;
 }
@@ -124,46 +104,54 @@ parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
 }
 
 void
-process_inbox(const char *dirname)
+write_html(int fd, char *content)
 {
-	DIR *dir;
-	struct dirent *ent;
+	char buf[1024];
+	char *r, *w;
 
-	dir = opendir(dirname);
-	if (!dir) die("opendir(\"%s\"): %s", dirname, strerror(errno));
+	dprintf(fd, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\"/>\n<title>title</title>\n</head>\n<body>\n");
 
-	while ((errno = 0, ent = readdir(dir))) {
-		if (ent->d_name[0] == '.') continue;
-		printf("Regarding file %s:\n", ent->d_name);
-
-		/* FIXME concat dirname with ent name */
-		/* TODO error checking */
-		int fd = open(ent->d_name, O_RDONLY);
-		struct stat meta;
-		fstat(fd, &meta);
-		char *content = malloc(meta.st_size + 1);
-		read(fd, content, meta.st_size);
-		content[meta.st_size] = '\0';
-		close(fd);
+	for (r = content, w = buf; *r; r++) {
 		
-		char *pointer = content;
-		if (!parse_header(&pointer, print_field)) {
-			printf("can't parse header\n");
+		switch (*r) {
+		case '<': memcpy(w, "&lt;", 4); w += 4; break;
+		case '>': memcpy(w, "&gt;", 4); w += 4; break;
+		case '\n': memcpy(w, "\n<br/>\n", 7); w += 7; break;
+		default: *w++ = *r;
 		}
 
-		free(content);
-
-		printf("\n\n\n");
+		if (w + 7 > buf + sizeof buf) {
+			write(fd, buf, w - buf);
+			w = buf;
+		}
 	}
-	if (errno) die("readdir(\"%s\"): %s", dirname, strerror(errno));
+	write(fd, buf, w - buf);
 
-	closedir(dir);
+	dprintf(fd, "\n</body>\n</html>\n");
 }
 
 int
-main()
+main(int argc, char **argv)
 {
-	process_inbox(".");
+	if (argc != 2) return 1;
+
+	/* TODO error checking */
+	int fd = open(argv[1], O_RDONLY);
+	struct stat meta;
+	fstat(fd, &meta);
+	char *content = malloc(meta.st_size + 1);
+	read(fd, content, meta.st_size);
+	content[meta.st_size] = '\0';
+	close(fd);
+	
+	char *pointer = content;
+	if (!parse_header(&pointer, print_field)) {
+		fprintf(stderr, "can't parse header\n");
+	} else {
+		write_html(1, pointer);
+	}
+
+	free(content);
 	return 0;
 }
 
