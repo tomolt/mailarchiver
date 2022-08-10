@@ -171,16 +171,63 @@ decode_base64(char *str)
 }
 
 bool
+decode_encwords(char *str)
+{
+	char *rhead, *whead, *mark;
+	char encoding;
+	char *c;
+
+	rhead = whead = str;
+	while ((mark = strstr(rhead, "=?"))) {
+		memcpy(whead, rhead, mark - rhead);
+		whead += mark - rhead;
+		rhead = mark + 2;
+
+		if (!(mark = strchr(rhead, '?'))) return false;
+		rhead = mark + 1;
+
+		if (*rhead != 'Q' && *rhead != 'B') return false;
+		encoding = *rhead++;
+		if (*rhead != '?') return false;
+		rhead++;
+
+		if (!(mark = strchr(rhead, '?'))) return false;
+		if (mark[1] != '=') return false;
+
+		*mark = '\0';
+		if (encoding == 'Q') {
+			for (c = rhead; *c; c++) {
+				if (*c == '_') *c = ' ';
+			}
+			if (!decode_qprintable(rhead)) return false;
+		} else {
+			if (!decode_base64(rhead)) return false;
+		}
+		memcpy(whead, rhead, strlen(rhead));
+		whead += strlen(rhead);
+
+		rhead = mark + 2;
+	}
+	memcpy(whead, rhead, strlen(rhead));
+	whead += strlen(rhead);
+	*whead = '\0';
+	return true;
+}
+
+bool
 parse_field(char *key, char *value)
 {
 	if (!strcasecmp(key, "From")) {
 		normalize_ws(value);
+		if (!decode_encwords(value)) return false;
 		mail.author = value;
 	} else if (!strcasecmp(key, "Subject")) {
 		normalize_ws(value);
+		if (!decode_encwords(value)) return false;
 		mail.subject = value;
 	} else if (!strcasecmp(key, "Date")) {
 		normalize_ws(value);
+		if (!decode_encwords(value)) return false;
 		mail.date = value;
 #if 0
 	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
@@ -251,7 +298,7 @@ main(int argc, char **argv)
 		fprintf(stderr, "can't parse header\n");
 	} else {
 		mail.content = pointer;
-		decode_qprintable(mail.content);
+		if (!decode_qprintable(mail.content)) return 1;
 		write_html(1);
 	}
 
