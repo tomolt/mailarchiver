@@ -1,5 +1,8 @@
 include config.mk
 
+SRC = mailarchiver.c
+OBJ = ${SRC:.c=.o}
+
 .POSIX:
 
 .PHONY: all clean install uninstall
@@ -7,7 +10,7 @@ include config.mk
 all: mailarchiver
 
 clean:
-	rm -f mailarchiver.o mailarchiver
+	rm -f $(OBJ) mailarchiver
 
 install: mailarchiver
 	mkdir -p "$(DESTDIR)$(PREFIX)/bin"
@@ -17,9 +20,14 @@ install: mailarchiver
 uninstall:
 	rm -f "$(DESTDIR)$(PREFIX)/bin/mailarchiver"
 
-mailarchiver: mailarchiver.o
-	$(LD) $(LDFLAGS) -o $@ $^ $(LIBS)
+mailarchiver: $(OBJ)
+	$(LD) $(LDFLAGS) -o $@ $(OBJ) $(LIBS)
 
-mailarchiver.o: mailarchiver.c
-	$(CC) $(CFLAGS) $(CPPFLAGS) -c -o $@ $<
+.c.o:
+	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
+
+config.h:
+	cp config.def.h $@
+
+$(OBJ): config.h config.mk
 

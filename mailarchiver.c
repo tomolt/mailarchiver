@@ -9,6 +9,8 @@
 #include <unistd.h>
 #include <strings.h>
 
+#include "config.h"
+
 void
 die(const char *format, ...)
 {
@@ -109,7 +111,7 @@ write_html(int fd, char *content)
 	char buf[1024];
 	char *r, *w;
 
-	dprintf(fd, "<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"utf-8\"/>\n<title>title</title>\n</head>\n<body>\n");
+	dprintf(fd, "%stitle%s", html_header1, html_header2);
 
 	for (r = content, w = buf; *r; r++) {
 		
@@ -127,7 +129,7 @@ write_html(int fd, char *content)
 	}
 	write(fd, buf, w - buf);
 
-	dprintf(fd, "\n</body>\n</html>\n");
+	dprintf(fd, "%s", html_footer);
 }
 
 int
