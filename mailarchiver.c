@@ -268,10 +268,13 @@ encode_html(int fd, char *str)
 		switch (*r) {
 		case '<': memcpy(w, "&lt;", 4); w += 4; break;
 		case '>': memcpy(w, "&gt;", 4); w += 4; break;
+		case '&': memcpy(w, "&amp;", 5); w += 5; break;
+		case '"': memcpy(w, "&quot;", 6); w += 6; break;
 		case '\n': memcpy(w, "\n<br/>\n", 7); w += 7; break;
+		case '\t': memcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;", 24); w += 24; break;
 		default: *w++ = *r;
 		}
-		if (w + 7 > buf + sizeof buf) {
+		if (w + 24 > buf + sizeof buf) {
 			write(fd, buf, w - buf);
 			w = buf;
 		}
