@@ -11,6 +11,15 @@
 
 #include "config.h"
 
+struct mail {
+	char *subject;
+	char *author;
+	char *date;
+	char *content;
+};
+
+struct mail mail;
+
 void
 die(const char *format, ...)
 {
@@ -40,43 +49,6 @@ static inline bool
 is_key(char c)
 {
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
-}
-
-void
-normalize_ws(char *str)
-{
-	char *rhead, *whead;
-	bool inws;
-
-	rhead = whead = str;
-	inws = true;
-	while (*rhead) {
-		if (is_ws(*rhead)) {
-			if (!inws) inws = true, *whead++ = ' ';
-		} else {
-			inws = false, *whead++ = *rhead;
-		}
-		rhead++;
-	}
-	if (inws) --whead;
-	*whead = '\0';
-}
-
-bool
-print_field(char *key, char *value)
-{
-	if (!strcasecmp(key, "From") ||
-	    !strcasecmp(key, "Subject") ||
-	    !strcasecmp(key, "Date") ||
-	    !strcasecmp(key, "Message-ID") ||
-	    !strcasecmp(key, "References") ||
-	    !strcasecmp(key, "In-Reply-To") ||
-	    !strcasecmp(key, "Content-Type") ||
-	    !strcasecmp(key, "Content-Transfer-Encoding")) {
-		normalize_ws(value);
-		fprintf(stderr, "%s is %s\n", key, value);
-	}
-	return true;
 }
 
 bool
@@ -110,6 +82,26 @@ parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
 
 	*pointer = cursor;
 	return true;
+}
+
+void
+normalize_ws(char *str)
+{
+	char *rhead, *whead;
+	bool inws;
+
+	rhead = whead = str;
+	inws = true;
+	while (*rhead) {
+		if (is_ws(*rhead)) {
+			if (!inws) inws = true, *whead++ = ' ';
+		} else {
+			inws = false, *whead++ = *rhead;
+		}
+		rhead++;
+	}
+	if (inws) --whead;
+	*whead = '\0';
 }
 
 bool
@@ -178,30 +170,65 @@ decode_base64(char *str)
 	return true;
 }
 
+bool
+parse_field(char *key, char *value)
+{
+	if (!strcasecmp(key, "From")) {
+		normalize_ws(value);
+		mail.author = value;
+	} else if (!strcasecmp(key, "Subject")) {
+		normalize_ws(value);
+		mail.subject = value;
+	} else if (!strcasecmp(key, "Date")) {
+		normalize_ws(value);
+		mail.date = value;
+#if 0
+	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
+		if (!strcasecmp(key, "quoted-printable")) {
+		} else if (!strcasecmp(key, "base64")) {
+		} else {
+		}
+#endif
+	}
+	return true;
+}
+
 void
-write_html(int fd, char *content)
+encode_html(int fd, char *str)
 {
 	char buf[1024];
 	char *r, *w;
 
-	dprintf(fd, "%stitle%s", html_header1, html_header2);
-
-	for (r = content, w = buf; *r; r++) {
-		
+	for (r = str, w = buf; *r; r++) {
 		switch (*r) {
 		case '<': memcpy(w, "&lt;", 4); w += 4; break;
 		case '>': memcpy(w, "&gt;", 4); w += 4; break;
 		case '\n': memcpy(w, "\n<br/>\n", 7); w += 7; break;
 		default: *w++ = *r;
 		}
-
 		if (w + 7 > buf + sizeof buf) {
 			write(fd, buf, w - buf);
 			w = buf;
 		}
 	}
 	write(fd, buf, w - buf);
+}
 
+void
+write_html(int fd)
+{
+	dprintf(fd, "%s", html_header1);
+	encode_html(fd, mail.subject);
+	dprintf(fd, "%s", html_header2);
+	dprintf(fd, "<h1>");
+	encode_html(fd, mail.subject);
+	dprintf(fd, "</h1>\n");
+	dprintf(fd, "<b>From:</b> ");
+	encode_html(fd, mail.author);
+	dprintf(fd, "<br/>\n<b>Date:</b> ");
+	encode_html(fd, mail.date);
+	dprintf(fd, "<br/>\n<hr/>\n");
+	encode_html(fd, mail.content);
 	dprintf(fd, "%s", html_footer);
 }
 
@@ -220,11 +247,12 @@ main(int argc, char **argv)
 	close(fd);
 	
 	char *pointer = content;
-	if (!parse_header(&pointer, print_field)) {
+	if (!parse_header(&pointer, parse_field)) {
 		fprintf(stderr, "can't parse header\n");
 	} else {
-		decode_qprintable(pointer);
-		write_html(1, pointer);
+		mail.content = pointer;
+		decode_qprintable(mail.content);
+		write_html(1);
 	}
 
 	free(content);
