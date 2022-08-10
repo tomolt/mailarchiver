@@ -138,6 +138,46 @@ decode_qprintable(char *str)
 	return true;
 }
 
+static int
+decode_base64_digit(char c)
+{
+	if (c >= 'A' && c <= 'Z') return c - 'A';
+	if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+	if (c >= '0' && c <= '9') return c - '0' + 52;
+	if (c == '+') return 62;
+	if (c == '/') return 63;
+	return -1;
+}
+
+bool
+decode_base64(char *str)
+{
+	/* This implementation is terribly inefficient, but it should suffice for now. */
+
+	char *rhead, *whead;
+	unsigned long value;
+	int digit;
+	int bits;
+
+	rhead = whead = str;
+	value = 0;
+	bits = 0;
+	while (*rhead && *rhead != '=') {
+		digit = decode_base64_digit(*rhead++);
+		if (digit < 0) return false;
+		value <<= 6;
+		value |= digit;
+		bits += 6;
+		if (bits >= 8) {
+			bits -= 8;
+			*whead++ = value >> bits;
+			value &= (1u << bits) - 1u;
+		}
+	}
+	*whead = '\0';
+	return true;
+}
+
 void
 write_html(int fd, char *content)
 {
