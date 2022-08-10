@@ -22,6 +22,13 @@ die(const char *format, ...)
 	exit(1);
 }
 
+/* only uppercase allowed! */
+static inline bool
+is_hex(char c)
+{
+	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
+}
+
 static inline bool
 is_ws(char c)
 {
@@ -105,6 +112,32 @@ parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
 	return true;
 }
 
+bool
+decode_qprintable(char *str)
+{
+	char *rhead, *whead, *eq;
+
+	rhead = whead = str;
+	while ((eq = strchr(rhead, '='))) {
+		memmove(whead, rhead, eq - rhead);
+		whead += eq - rhead;
+		rhead = eq + 1;
+		if (is_hex(rhead[0]) && is_hex(rhead[1])) {
+			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
+				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
+			rhead += 2;
+		} else if (rhead[0] == '\r' && rhead[1] == '\n') {
+			rhead += 2;
+		} else if (rhead[0] == '\n') {
+			rhead += 1;
+		} else return false;
+	}
+	memmove(whead, rhead, strlen(rhead));
+	whead += strlen(rhead);
+	*whead = '\0';
+	return true;
+}
+
 void
 write_html(int fd, char *content)
 {
@@ -150,6 +183,7 @@ main(int argc, char **argv)
 	if (!parse_header(&pointer, print_field)) {
 		fprintf(stderr, "can't parse header\n");
 	} else {
+		decode_qprintable(pointer);
 		write_html(1, pointer);
 	}
 
