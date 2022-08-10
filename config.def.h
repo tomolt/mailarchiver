@@ -1,3 +1,5 @@
+/* See LICENSE file for copyright and license details. */
+
 static const char *html_header1 =
 	"<!DOCTYPE html>\n"
 	"<html>\n"

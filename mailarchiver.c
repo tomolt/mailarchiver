@@ -1,3 +1,17 @@
+/* See LICENSE file for copyright and license details.
+ *
+ * A mailing list web archiver
+ *
+ * Implementation Note:
+ *
+ * Parsing & decoding generates a lot of strings. Instead of allocating space
+ * for each output string, we do (nearly) all string transforms in-place. The
+ * typical idiom for this is to keep two pointers into memory, rhead and whead
+ * (the 'read' and 'write' head respectively). We can read bytes from rhead and
+ * write bytes to whead without issue as long as the following holds:
+ * Every time whead is incremented, rhead is also moved by at least one byte.
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -8,12 +22,13 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <strings.h>
+#include <errno.h>
 
 #include "config.h"
 
 struct mail {
 	char *subject;
-	char *author;
+	char *from;
 	char *date;
 	char *content;
 };
@@ -41,7 +56,7 @@ is_hex(char c)
 static inline bool
 is_ws(char c)
 {
-	/* TODO */
+	/* TODO cover all types of whitespace allowed in mail header */
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
@@ -115,6 +130,7 @@ decode_qprintable(char *str)
 		whead += eq - rhead;
 		rhead = eq + 1;
 		if (is_hex(rhead[0]) && is_hex(rhead[1])) {
+			/* TODO this can be implemented more cleanly */
 			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
 				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
 			rhead += 2;
@@ -170,6 +186,8 @@ decode_base64(char *str)
 	return true;
 }
 
+/* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
+ * that may appear in header fields. */
 bool
 decode_encwords(char *str)
 {
@@ -215,12 +233,12 @@ decode_encwords(char *str)
 }
 
 bool
-parse_field(char *key, char *value)
+process_field(char *key, char *value)
 {
 	if (!strcasecmp(key, "From")) {
 		normalize_ws(value);
 		if (!decode_encwords(value)) return false;
-		mail.author = value;
+		mail.from = value;
 	} else if (!strcasecmp(key, "Subject")) {
 		normalize_ws(value);
 		if (!decode_encwords(value)) return false;
@@ -271,7 +289,7 @@ write_html(int fd)
 	encode_html(fd, mail.subject);
 	dprintf(fd, "</h1>\n");
 	dprintf(fd, "<b>From:</b> ");
-	encode_html(fd, mail.author);
+	encode_html(fd, mail.from);
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
 	encode_html(fd, mail.date);
 	dprintf(fd, "<br/>\n<hr/>\n");
@@ -282,27 +300,37 @@ write_html(int fd)
 int
 main(int argc, char **argv)
 {
+	int fd;
+	struct stat meta;
+	char *text;
+
 	if (argc != 2) return 1;
 
-	/* TODO error checking */
-	int fd = open(argv[1], O_RDONLY);
-	struct stat meta;
-	fstat(fd, &meta);
-	char *content = malloc(meta.st_size + 1);
-	read(fd, content, meta.st_size);
-	content[meta.st_size] = '\0';
+	fd = open(argv[1], O_RDONLY);
+	if (fd < 0) die("cannot open '%s': %s", argv[1], strerror(errno));
+
+	if (fstat(fd, &meta) < 0) die("cannot stat '%s': %s", argv[1], strerror(errno));
+
+	errno = 0;
+	text = malloc(meta.st_size + 1);
+	if (!text) die("malloc: %s", strerror(errno));
+
+	/* TODO we should probably handle EINTR and partial reads */
+	if (read(fd, text, meta.st_size) < 0)
+		die("read: %s", strerror(errno));
+	text[meta.st_size] = '\0';
 	close(fd);
 	
-	char *pointer = content;
-	if (!parse_header(&pointer, parse_field)) {
-		fprintf(stderr, "can't parse header\n");
-	} else {
-		mail.content = pointer;
-		if (!decode_qprintable(mail.content)) return 1;
-		write_html(1);
-	}
+	mail.content = text;
+	if (!parse_header(&mail.content, process_field))
+		die("cannot parse mail header");
 
-	free(content);
+	if (!decode_qprintable(mail.content))
+		die("cannot decode mail contents");
+
+	write_html(1);
+
+	free(text);
 	return 0;
 }
 
