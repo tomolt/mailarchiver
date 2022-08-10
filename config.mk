@@ -1,3 +1,6 @@
+# mailarchiver version
+VERSION = 0.0
+
 # Customize below to fit your system
 
 # compiler and linker
@@ -9,7 +12,7 @@ PREFIX = /usr/local
 MANPREFIX = $(PREFIX)/share/man
 
 # compiler flags
-CPPFLAGS =
+CPPFLAGS = -DVERSION=\"$(VERSION)\"
 CFLAGS   = -g -Wall
 LDFLAGS  = -g
 
