@@ -68,6 +68,21 @@ is_key(char c)
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
 }
 
+static inline bool
+is_special(char c)
+{
+	return strchr("<>[]:;@\\,", c) != NULL;
+}
+
+static inline bool
+is_atom(char c)
+{
+	if (c >= 'a' && c <= 'z') return true;
+	if (c >= 'A' && c <= 'Z') return true;
+	if (c >= '0' && c <= '9') return true;
+	return strchr("!#$%&'*+-/=?^_`{|}~.", c) != NULL;
+}
+
 bool
 split_header_from_body(char *msg, size_t length, char **body)
 {
@@ -118,7 +133,7 @@ parse_header(char *header, bool (*field_cb)(char *key, char *value))
 }
 
 void
-normalize_ws(char *str)
+collapse_ws(char *str)
 {
 	char *rhead, *whead;
 	bool inws;
@@ -135,6 +150,69 @@ normalize_ws(char *str)
 	}
 	if (inws) --whead;
 	*whead = '\0';
+}
+
+bool
+tokenize(char **pointer, char **token)
+{
+	char *cursor;
+	int depth;
+
+	cursor = *pointer;
+
+	/* skip ws and comments */
+	for (;;) {
+		if (is_ws(*cursor)) {
+			cursor++;
+		} else if (*cursor == '(') {
+			depth = 1;
+			while (depth) {
+				switch (*cursor++) {
+				case '\0': return false;
+				case '(': depth++; break;
+				case ')': depth--; break;
+				case '\\': if (!*cursor++) return false;
+				}
+			}
+		} else {
+			break;
+		}
+	}
+	if (!*cursor) return false;
+	
+	/* special char */
+	if (is_special(*cursor)) {
+		*token = cursor;
+		*pointer = cursor + 1;
+		return true;
+	}
+
+	/* quoted string */
+	if (*cursor == '"') {
+		cursor++;
+		*token = cursor;
+		for (;;) {
+			switch (*cursor++) {
+			case '\0': return false;
+			case '"':
+				   *cursor = '\0';
+				   collapse_ws(*token);
+				   *pointer = cursor + 1;
+				   return true;
+			case '\\': if (!*cursor++) return false;
+			}
+		}
+	}
+
+	/* atom */
+	if (is_atom(*cursor)) {
+		*token = cursor;
+		do cursor++; while (is_atom(*cursor));
+		*pointer = cursor;
+		return true;
+	}
+
+	return false;
 }
 
 char *
@@ -255,24 +333,17 @@ bool
 process_field(char *key, char *value)
 {
 	if (!strcasecmp(key, "From")) {
-		normalize_ws(value);
+		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
 		mail.from = value;
 	} else if (!strcasecmp(key, "Subject")) {
-		normalize_ws(value);
+		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
 		mail.subject = value;
 	} else if (!strcasecmp(key, "Date")) {
-		normalize_ws(value);
+		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
 		mail.date = value;
-#if 0
-	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
-		if (!strcasecmp(key, "quoted-printable")) {
-		} else if (!strcasecmp(key, "base64")) {
-		} else {
-		}
-#endif
 	}
 	return true;
 }
