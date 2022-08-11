@@ -153,10 +153,13 @@ decode_qprintable(char *rhead, char *whead, size_t length)
 			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
 				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
 			rhead += 2;
+			length -= 2;
 		} else if (length >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
 			rhead += 2;
+			length -= 2;
 		} else if (length >= 1 && rhead[0] == '\n') {
 			rhead += 1;
+			length -= 1;
 		} else return NULL;
 	}
 	memmove(whead, rhead, length);
