@@ -266,12 +266,12 @@ encode_html(int fd, char *str)
 
 	for (r = str, w = buf; *r; r++) {
 		switch (*r) {
-		case '<': memcpy(w, "&lt;", 4); w += 4; break;
-		case '>': memcpy(w, "&gt;", 4); w += 4; break;
-		case '&': memcpy(w, "&amp;", 5); w += 5; break;
-		case '"': memcpy(w, "&quot;", 6); w += 6; break;
-		case '\n': memcpy(w, "\n<br/>\n", 7); w += 7; break;
-		case '\t': memcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;", 24); w += 24; break;
+		case '<':  w = stpcpy(w, "&lt;"); break;
+		case '>':  w = stpcpy(w, "&gt;"); break;
+		case '&':  w = stpcpy(w, "&amp;"); break;
+		case '"':  w = stpcpy(w, "&quot;"); break;
+		case '\n': w = stpcpy(w, "\n<br/>\n"); break;
+		case '\t': w = stpcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;"); break;
 		default: *w++ = *r;
 		}
 		if (buf + sizeof buf - w <= 24) {
