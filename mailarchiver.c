@@ -33,7 +33,7 @@ struct mail {
 	char *content;
 };
 
-struct mail mail;
+static struct mail mail;
 
 void
 die(const char *format, ...)
