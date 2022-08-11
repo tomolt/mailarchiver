@@ -89,7 +89,7 @@ split_header_from_body(char *msg, size_t length, char **body)
 {
 	char *pos = msg;
 
-	while ((pos = memchr(pos, '\n', length))) {
+	while ((pos = memchr(pos, '\n', length - (pos - msg)))) {
 		pos++;
 		if (pos < msg + length && pos[0] == '\n') {
 			*pos = '\0';
