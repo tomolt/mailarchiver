@@ -144,24 +144,21 @@ parse_header(char *header, bool (*field_cb)(char *key, char *value))
 	return true;
 }
 
+/* Converts each run of whitespace in str to a single space. */
 void
 collapse_ws(char *str)
 {
-	char *rhead, *whead;
-	bool inws;
-
-	rhead = whead = str;
-	inws = true;
-	while (*rhead) {
-		if (is_ws(*rhead)) {
-			if (!inws) inws = true, *whead++ = ' ';
-		} else {
-			inws = false, *whead++ = *rhead;
+	char *src, *dst;
+	src = dst = str;
+	while (is_ws(*src)) src++;
+	while (*src) {
+		*dst++ = *src++;
+		if (is_ws(*src)) {
+			while (is_ws(*src)) src++;
+			if (*src) *dst++ = ' ';
 		}
-		rhead++;
 	}
-	if (inws) --whead;
-	*whead = '\0';
+	*dst = 0;
 }
 
 static bool
