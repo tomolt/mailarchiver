@@ -30,7 +30,8 @@ struct mail {
 	char *subject;
 	char *from;
 	char *date;
-	char *content;
+	char *body;
+	size_t length; /* of the body */
 };
 
 static struct mail mail;
@@ -67,15 +68,33 @@ is_key(char c)
 }
 
 bool
-parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
+split_header_from_body(char *msg, size_t length, char **body)
 {
-	char *cursor = *pointer;
+	char *pos = msg;
+
+	while ((pos = memchr(pos, '\n', length))) {
+		pos++;
+		if (pos < msg + length && pos[0] == '\n') {
+			*pos = '\0';
+			*body = pos + 1;
+			return true;
+		}
+		if (pos < msg + length - 1 && pos[0] == '\r' && pos[1] == '\n') {
+			*pos = '\0';
+			*body = pos + 2;
+			return true;
+		}
+	}
+	return false;
+}
+
+bool
+parse_header(char *header, bool (*field_cb)(char *key, char *value))
+{
+	char *cursor = header;
 	char *key, *value;
 
-	for (;;) {
-		if (!*cursor) return false;
-		if (*cursor == '\n') break;
-
+	while (*cursor) {
 		if (!is_key(*cursor)) return false;
 		key = cursor;
 		do cursor++; while (is_key(*cursor));
@@ -94,8 +113,6 @@ parse_header(char **pointer, bool (*field_cb)(char *key, char *value))
 
 		if (!field_cb(key, value)) return false;
 	}
-
-	*pointer = cursor;
 	return true;
 }
 
@@ -213,6 +230,8 @@ decode_encwords(char *str)
 		if (mark[1] != '=') return false;
 
 		*mark = '\0';
+		/* FIXME the calls to the decoding functions here are broken
+		 * since they don't take whead into account! */
 		if (encoding == 'Q') {
 			for (c = rhead; *c; c++) {
 				if (*c == '_') *c = ' ';
@@ -296,7 +315,7 @@ write_html(int fd)
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
 	encode_html(fd, mail.date);
 	dprintf(fd, "<br/>\n<hr/>\n");
-	encode_html(fd, mail.content);
+	encode_html(fd, mail.body);
 	dprintf(fd, "%s", html_footer);
 }
 
@@ -324,11 +343,14 @@ main(int argc, char **argv)
 	text[meta.st_size] = '\0';
 	close(fd);
 	
-	mail.content = text;
-	if (!parse_header(&mail.content, process_field))
+	if (!split_header_from_body(text, meta.st_size, &mail.body))
+		die("cannot discern mail header from body");
+	mail.length = meta.st_size - (mail.body - text);
+
+	if (!parse_header(text, process_field))
 		die("cannot parse mail header");
 
-	if (!decode_qprintable(mail.content))
+	if (!decode_qprintable(mail.body))
 		die("cannot decode mail contents");
 
 	write_html(1);
