@@ -136,31 +136,31 @@ normalize_ws(char *str)
 	*whead = '\0';
 }
 
-bool
-decode_qprintable(char *str)
+char *
+decode_qprintable(char *rhead, char *whead, size_t length)
 {
-	char *rhead, *whead, *eq;
+	char *eq;
 
-	rhead = whead = str;
 	while ((eq = strchr(rhead, '='))) {
 		memmove(whead, rhead, eq - rhead);
 		whead += eq - rhead;
+		length -= eq - rhead + 1;
 		rhead = eq + 1;
-		if (is_hex(rhead[0]) && is_hex(rhead[1])) {
+
+		if (length >= 2 && is_hex(rhead[0]) && is_hex(rhead[1])) {
 			/* TODO this can be implemented more cleanly */
 			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
 				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
 			rhead += 2;
-		} else if (rhead[0] == '\r' && rhead[1] == '\n') {
+		} else if (length >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
 			rhead += 2;
-		} else if (rhead[0] == '\n') {
+		} else if (length >= 1 && rhead[0] == '\n') {
 			rhead += 1;
-		} else return false;
+		} else return NULL;
 	}
-	memmove(whead, rhead, strlen(rhead));
-	whead += strlen(rhead);
-	*whead = '\0';
-	return true;
+	memmove(whead, rhead, length);
+	whead += length;
+	return whead;
 }
 
 static int
@@ -174,22 +174,20 @@ decode_base64_digit(char c)
 	return -1;
 }
 
-bool
-decode_base64(char *str)
+char *
+decode_base64(char *rhead, char *whead, size_t length)
 {
 	/* This implementation is terribly inefficient, but it should suffice for now. */
 
-	char *rhead, *whead;
 	unsigned long value;
 	int digit;
 	int bits;
 
-	rhead = whead = str;
 	value = 0;
 	bits = 0;
-	while (*rhead && *rhead != '=') {
-		digit = decode_base64_digit(*rhead++);
-		if (digit < 0) return false;
+	while (length && *rhead != '=') {
+		digit = decode_base64_digit(*rhead);
+		if (digit < 0) return NULL;
 		value <<= 6;
 		value |= digit;
 		bits += 6;
@@ -198,9 +196,10 @@ decode_base64(char *str)
 			*whead++ = value >> bits;
 			value &= (1u << bits) - 1u;
 		}
+		rhead++;
+		length--;
 	}
-	*whead = '\0';
-	return true;
+	return whead;
 }
 
 /* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
@@ -229,19 +228,16 @@ decode_encwords(char *str)
 		if (!(mark = strchr(rhead, '?'))) return false;
 		if (mark[1] != '=') return false;
 
-		*mark = '\0';
-		/* FIXME the calls to the decoding functions here are broken
-		 * since they don't take whead into account! */
 		if (encoding == 'Q') {
-			for (c = rhead; *c; c++) {
+			for (c = rhead; c < mark; c++) {
 				if (*c == '_') *c = ' ';
 			}
-			if (!decode_qprintable(rhead)) return false;
+			whead = decode_qprintable(rhead, whead, mark - rhead);
+			if (!whead) return false;
 		} else {
-			if (!decode_base64(rhead)) return false;
+			whead = decode_base64(rhead, whead, mark - rhead);
+			if (!whead) return false;
 		}
-		memmove(whead, rhead, strlen(rhead));
-		whead += strlen(rhead);
 
 		rhead = mark + 2;
 	}
@@ -324,7 +320,7 @@ main(int argc, char **argv)
 {
 	int fd;
 	struct stat meta;
-	char *text;
+	char *text, *ptr;
 
 	if (argc != 2) return 1;
 
@@ -350,8 +346,9 @@ main(int argc, char **argv)
 	if (!parse_header(text, process_field))
 		die("cannot parse mail header");
 
-	if (!decode_qprintable(mail.body))
-		die("cannot decode mail contents");
+	ptr = decode_qprintable(mail.body, mail.body, mail.length);
+	if (!ptr) die("cannot decode mail contents");
+	mail.length = ptr - mail.body;
 
 	write_html(1);
 
