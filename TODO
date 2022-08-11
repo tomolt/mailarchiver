@@ -1,8 +1,6 @@
 - MIME
-- Stripping comments from header fields (but not from within quotes!)
 - Converting ISO 8859-1 to UTF-8
 - Maildir
 - Generating an index site
 - Thread navigation
 - Persistent datastructures / caching for incremental update of index & navigation
-- Properly tokenizing certain header fields?
