@@ -1,9 +1,9 @@
+.POSIX:
+
 include config.mk
 
 SRC = mailarchiver.c
 OBJ = ${SRC:.c=.o}
-
-.POSIX:
 
 .PHONY: all clean install uninstall
 
