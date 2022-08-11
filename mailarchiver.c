@@ -274,7 +274,7 @@ encode_html(int fd, char *str)
 		case '\t': memcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;", 24); w += 24; break;
 		default: *w++ = *r;
 		}
-		if (w + 24 > buf + sizeof buf) {
+		if (buf + sizeof buf - w <= 24) {
 			write(fd, buf, w - buf);
 			w = buf;
 		}
