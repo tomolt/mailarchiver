@@ -274,17 +274,18 @@ process_field(char *key, char *value)
 }
 
 void
-encode_html(int fd, char *str)
+encode_html(int fd, char *mem, size_t length)
 {
 	char buf[1024];
 	char *r, *w;
 
-	for (r = str, w = buf; *r; r++) {
+	for (r = mem, w = buf; r < mem + length; r++) {
 		switch (*r) {
 		case '<':  w = stpcpy(w, "&lt;"); break;
 		case '>':  w = stpcpy(w, "&gt;"); break;
 		case '&':  w = stpcpy(w, "&amp;"); break;
 		case '"':  w = stpcpy(w, "&quot;"); break;
+		case '\0': w = stpcpy(w, "?NUL?"); break;
 		case '\n': w = stpcpy(w, "\n<br/>\n"); break;
 		case '\t': w = stpcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;"); break;
 		default: *w++ = *r;
@@ -301,17 +302,17 @@ void
 write_html(int fd)
 {
 	dprintf(fd, "%s", html_header1);
-	encode_html(fd, mail.subject);
+	encode_html(fd, mail.subject, strlen(mail.subject));
 	dprintf(fd, "%s", html_header2);
 	dprintf(fd, "<h1>");
-	encode_html(fd, mail.subject);
+	encode_html(fd, mail.subject, strlen(mail.subject));
 	dprintf(fd, "</h1>\n");
 	dprintf(fd, "<b>From:</b> ");
-	encode_html(fd, mail.from);
+	encode_html(fd, mail.from, strlen(mail.from));
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
-	encode_html(fd, mail.date);
+	encode_html(fd, mail.date, strlen(mail.date));
 	dprintf(fd, "<br/>\n<hr/>\n");
-	encode_html(fd, mail.body);
+	encode_html(fd, mail.body, mail.length);
 	dprintf(fd, "%s", html_footer);
 }
 
