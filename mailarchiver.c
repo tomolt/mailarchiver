@@ -197,7 +197,7 @@ decode_encwords(char *str)
 
 	rhead = whead = str;
 	while ((mark = strstr(rhead, "=?"))) {
-		memcpy(whead, rhead, mark - rhead);
+		memmove(whead, rhead, mark - rhead);
 		whead += mark - rhead;
 		rhead = mark + 2;
 
@@ -221,12 +221,12 @@ decode_encwords(char *str)
 		} else {
 			if (!decode_base64(rhead)) return false;
 		}
-		memcpy(whead, rhead, strlen(rhead));
+		memmove(whead, rhead, strlen(rhead));
 		whead += strlen(rhead);
 
 		rhead = mark + 2;
 	}
-	memcpy(whead, rhead, strlen(rhead));
+	memmove(whead, rhead, strlen(rhead));
 	whead += strlen(rhead);
 	*whead = '\0';
 	return true;
