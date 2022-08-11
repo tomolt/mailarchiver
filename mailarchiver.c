@@ -33,6 +33,7 @@ struct mail {
 	char *date;
 	char *body;
 	size_t length; /* of the body */
+	char tenc; /* transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
 };
 
 static struct mail mail;
@@ -332,6 +333,8 @@ decode_encwords(char *str)
 bool
 process_field(char *key, char *value)
 {
+	char *pointer, *token;
+
 	if (!strcasecmp(key, "From")) {
 		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
@@ -344,6 +347,22 @@ process_field(char *key, char *value)
 		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
 		mail.date = value;
+	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
+		pointer = value;
+		if (!tokenize(&pointer, &token)) return false;
+		if (!strcasecmp(token, "7bit")) {
+			mail.tenc = '\0';
+		} else if (!strcasecmp(token, "8bit")) {
+			mail.tenc = '\0';
+		} else if (!strcasecmp(token, "binary")) {
+			mail.tenc = '\0';
+		} else if (!strcasecmp(token, "quoted-printable")) {
+			mail.tenc = 'Q';
+		} else if (!strcasecmp(token, "base64")) {
+			mail.tenc = 'B';
+		} else {
+			return false;
+		}
 	}
 	return true;
 }
@@ -417,9 +436,19 @@ main(int argc, char **argv)
 	if (!parse_header(text, process_field))
 		die("cannot parse mail header");
 
-	ptr = decode_qprintable(mail.body, mail.body, mail.length);
-	if (!ptr) die("cannot decode mail contents");
-	mail.length = ptr - mail.body;
+	switch (mail.tenc) {
+	case 'Q':
+		ptr = decode_qprintable(mail.body, mail.body, mail.length);
+		if (!ptr) die("cannot decode mail contents");
+		mail.length = ptr - mail.body;
+		break;
+	
+	case 'B':
+		ptr = decode_base64(mail.body, mail.body, mail.length);
+		if (!ptr) die("cannot decode mail contents");
+		mail.length = ptr - mail.body;
+		break;
+	}
 
 	write_html(1);
 
