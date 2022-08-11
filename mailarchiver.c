@@ -19,6 +19,7 @@
 #include <stdarg.h>
 
 #include <sys/stat.h>
+#include <sys/mman.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <strings.h>
@@ -330,14 +331,9 @@ main(int argc, char **argv)
 
 	if (fstat(fd, &meta) < 0) die("cannot stat '%s': %s", argv[1], strerror(errno));
 
-	errno = 0;
-	text = malloc(meta.st_size + 1);
-	if (!text) die("malloc: %s", strerror(errno));
-
-	/* TODO we should probably handle EINTR and partial reads */
-	if (read(fd, text, meta.st_size) < 0)
-		die("read: %s", strerror(errno));
-	text[meta.st_size] = '\0';
+	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	if (text == MAP_FAILED)
+		die("mmap: %s", strerror(errno));
 	close(fd);
 	
 	if (!split_header_from_body(text, meta.st_size, &mail.body))
@@ -353,7 +349,7 @@ main(int argc, char **argv)
 
 	write_html(1);
 
-	free(text);
+	munmap(text, meta.st_size);
 	return 0;
 }
 
