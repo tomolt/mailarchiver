@@ -60,6 +60,22 @@ die(const char *format, ...)
 	exit(1);
 }
 
+/* Like strcspn(), but takes explicit maximum lengths instead of relying on NUL termination. */
+size_t
+memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
+{
+#define UBITS (8 * sizeof (unsigned))
+	typedef const unsigned char *BYTEP;
+	BYTEP chr;
+	unsigned bitfield[256 / UBITS] = { 0 };
+	for (chr = (BYTEP) needle; chr < (BYTEP) needle + needlelen; chr++)
+		bitfield[*chr / UBITS] |= 1u << (*chr % UBITS);
+	for (chr = (BYTEP) hay; chr < (BYTEP) hay + haylen; chr++)
+		if ((bitfield[*chr / UBITS] >> (*chr % UBITS)) & 1u) break;
+#undef UBITS
+	return chr - (BYTEP) hay;
+}
+
 static inline bool
 is_ws(char c)
 {
@@ -390,24 +406,34 @@ process_field(char *key, char *value)
 void
 encode_html(int fd, char *mem, size_t length)
 {
-	char buf[1024];
-	char *r, *w;
+	char buf[4096];
+	char *w = buf;
+	size_t idx = 0, run;
 
-	for (r = mem, w = buf; r < mem + length; r++) {
-		switch (*r) {
-		case '<':  w = stpcpy(w, "&lt;"); break;
-		case '>':  w = stpcpy(w, "&gt;"); break;
-		case '&':  w = stpcpy(w, "&amp;"); break;
-		case '"':  w = stpcpy(w, "&quot;"); break;
-		case '\0': w = stpcpy(w, "?NUL?"); break;
-		default: *w++ = *r;
-		}
-		if (buf + sizeof buf - w <= 24) {
+	for (;;) {
+		run = memcspn(mem + idx, length - idx, "<>&\"\0", 5);
+		if ((w - buf) + run > sizeof buf - 16) {
 			write(fd, buf, w - buf);
 			w = buf;
 		}
+		if (run > sizeof buf - 16) {
+			write(fd, mem + idx, run);
+		} else {
+			memcpy(w, mem + idx, run);
+			w += run;
+		}
+		idx += run;
+		if (idx == length) break;
+
+		switch (mem[idx++]) {
+		case '<': w = stpcpy(w, "&lt;"); break;
+		case '>': w = stpcpy(w, "&gt;"); break;
+		case '&': w = stpcpy(w, "&amp;"); break;
+		case '"': w = stpcpy(w, "&quot;"); break;
+		default:  w = stpcpy(w, "?");
+		}
 	}
-	write(fd, buf, w - buf);
+	if (w > buf) write(fd, buf, w - buf);
 }
 
 void
@@ -437,6 +463,8 @@ main(int argc, char **argv)
 
 	if (argc != 2) return 1;
 
+	memset(&mail, 0, sizeof mail);
+	
 	fd = open(argv[1], O_RDONLY);
 	if (fd < 0) die("cannot open '%s': %s", argv[1], strerror(errno));
 
@@ -471,6 +499,7 @@ main(int argc, char **argv)
 	write_html(1);
 
 	munmap(text, meta.st_size);
+
 	return 0;
 }
 
