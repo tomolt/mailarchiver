@@ -233,23 +233,23 @@ decode_qprintable(char *rhead, char *whead, size_t length)
 {
 	char *eq;
 
-	while ((eq = strchr(rhead, '='))) {
+	while ((eq = memchr(rhead, '=', length))) {
 		memmove(whead, rhead, eq - rhead);
-		whead += eq - rhead;
+		whead  += eq - rhead;
 		length -= eq - rhead + 1;
-		rhead = eq + 1;
+		rhead   = eq + 1;
 
 		if (length >= 2 && is_hex(rhead[0]) && is_hex(rhead[1])) {
 			/* TODO this can be implemented more cleanly */
 			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
 				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
-			rhead += 2;
+			rhead  += 2;
 			length -= 2;
 		} else if (length >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
-			rhead += 2;
+			rhead  += 2;
 			length -= 2;
 		} else if (length >= 1 && rhead[0] == '\n') {
-			rhead += 1;
+			rhead  += 1;
 			length -= 1;
 		} else return NULL;
 	}
