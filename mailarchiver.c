@@ -36,6 +36,9 @@ struct mail {
 	char *subject;
 	char *from;
 	char *date;
+	char *to;
+	char *message_id;
+	char *in_reply_to;
 	char *body;
 	size_t length; /* of the body */
 	char tenc; /* transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
@@ -47,6 +50,7 @@ struct token {
 	int   evicted;
 };
 
+static char *mail_path;
 static struct mail mail;
 
 void
@@ -367,6 +371,18 @@ process_field(char *key, char *value)
 		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
 		mail.date = value;
+	} else if (!strcasecmp(key, "To")) {
+		collapse_ws(value);
+		if (!decode_encwords(value)) return false;
+		mail.to = value;
+	} else if (!strcasecmp(key, "Message-ID")) {
+		collapse_ws(value);
+		if (!decode_encwords(value)) return false;
+		mail.message_id = value;
+	} else if (!strcasecmp(key, "In-Reply-To")) {
+		collapse_ws(value);
+		if (!decode_encwords(value)) return false;
+		mail.in_reply_to = value;
 	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
 		token = TOKEN_INIT(value);
 		if (tokenize(&token) != TOKEN_ATOM) return false;
@@ -410,6 +426,14 @@ encode_html(int fd, char *mem, size_t length)
 	write(fd, buf, w - buf);
 }
 
+static void
+write_meta(int fd)
+{
+	dprintf(fd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		mail_path, mail.message_id, mail.date, mail.from, mail.to,
+		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
+}
+
 void
 write_html(int fd)
 {
@@ -433,26 +457,41 @@ main(int argc, char **argv)
 {
 	int fd;
 	struct stat meta;
-	char *text, *ptr;
+	char *text, *ptr, **arg;
+	bool do_print_meta = false;
 
-	if (argc != 2) return 1;
+	if (argc < 2) return 1;
 
-	fd = open(argv[1], O_RDONLY);
-	if (fd < 0) die("cannot open '%s': %s", argv[1], strerror(errno));
+	arg = &argv[1];
+	if (strcmp(*arg, "-m") == 0) {
+		do_print_meta = true;
+		++arg;
+	}
+	mail_path = *arg++;
 
-	if (fstat(fd, &meta) < 0) die("cannot stat '%s': %s", argv[1], strerror(errno));
+	if (*arg) die("excess arguments\n");
+
+	fd = open(mail_path, O_RDONLY);
+	if (fd < 0) die("cannot open '%s': %s", mail_path, strerror(errno));
+
+	if (fstat(fd, &meta) < 0) die("cannot stat '%s': %s", mail_path, strerror(errno));
 
 	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (text == MAP_FAILED)
 		die("mmap: %s", strerror(errno));
 	close(fd);
-	
+
 	if (!split_header_from_body(text, meta.st_size, &mail.body))
 		die("cannot discern mail header from body");
 	mail.length = meta.st_size - (mail.body - text);
 
 	if (!parse_header(text, process_field))
 		die("cannot parse mail header");
+
+	if (do_print_meta) {
+		write_meta(1);
+		return 0;
+	}
 
 	switch (mail.tenc) {
 	case 'Q':
