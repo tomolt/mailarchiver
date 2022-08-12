@@ -60,13 +60,6 @@ die(const char *format, ...)
 	exit(1);
 }
 
-/* only uppercase allowed! */
-static inline bool
-is_hex(char c)
-{
-	return (c >= '0' && c <= '9') || (c >= 'A' && c <= 'F');
-}
-
 static inline bool
 is_ws(char c)
 {
@@ -77,7 +70,7 @@ is_ws(char c)
 static inline bool
 is_key(char c)
 {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-';
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_';
 }
 
 static inline bool
@@ -228,10 +221,20 @@ restart:
 	return TOKEN_ERROR;
 }
 
+static int
+decode_hex_digit(char c)
+{
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= '0' && c <= '9') return c - '0';
+	return -1;
+}
+
 char *
 decode_qprintable(char *rhead, char *whead, size_t length)
 {
 	char *eq;
+	int lo, hi;
 
 	while ((eq = memchr(rhead, '=', length))) {
 		memmove(whead, rhead, eq - rhead);
@@ -239,10 +242,10 @@ decode_qprintable(char *rhead, char *whead, size_t length)
 		length -= eq - rhead + 1;
 		rhead   = eq + 1;
 
-		if (length >= 2 && is_hex(rhead[0]) && is_hex(rhead[1])) {
-			/* TODO this can be implemented more cleanly */
-			*whead++ = (rhead[0] >= 'A' ? rhead[0] - 'A' + 10 : rhead[0] - '0') * 16 +
-				(rhead[1] >= 'A' ? rhead[1] - 'A' + 10 : rhead[1] - '0');
+		if (length >= 2
+		&& (hi = decode_hex_digit(rhead[0])) >= 0
+		&& (lo = decode_hex_digit(rhead[1])) >= 0) {
+			*whead++ = hi * 16 + lo;
 			rhead  += 2;
 			length -= 2;
 		} else if (length >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
