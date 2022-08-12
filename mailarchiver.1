@@ -6,6 +6,7 @@
 .Nd mailing list web archiver
 .Sh SYNOPSIS
 .Nm
+.Op Fl m
 .Ar mail-file
 .Sh DESCRIPTION
 At some point,
@@ -17,5 +18,11 @@ Executing
 .Nm
 with a file containing a mail message as the argument
 will print a formatted HTML version of the message to stdout.
+.Pp
+The option
+.Fl m
+instead prints the following header fields as a single line of tab-separated values:
+.Dl [File path] [Message-ID] [Date] [From] [To] [In-Reply-To] [Subject]
+In-Reply-To and Subject may be empty.
 .Sh AUTHORS
 .An Thomas Oltmann Aq Mt thomas.oltmann.hhg@gmail.com
