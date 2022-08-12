@@ -70,7 +70,7 @@ is_ws(char c)
 static inline bool
 is_key(char c)
 {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '-' || c == '_';
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
 }
 
 static inline bool
@@ -284,6 +284,11 @@ decode_base64(char *rhead, char *whead, size_t length)
 	value = 0;
 	bits = 0;
 	while (length && *rhead != '=') {
+		if (is_ws(*rhead)) {
+			rhead++;
+			length--;
+			continue;
+		}
 		digit = decode_base64_digit(*rhead);
 		if (digit < 0) return NULL;
 		value <<= 6;
