@@ -395,8 +395,6 @@ encode_html(int fd, char *mem, size_t length)
 		case '&':  w = stpcpy(w, "&amp;"); break;
 		case '"':  w = stpcpy(w, "&quot;"); break;
 		case '\0': w = stpcpy(w, "?NUL?"); break;
-		case '\n': w = stpcpy(w, "\n<br/>\n"); break;
-		case '\t': w = stpcpy(w, "&nbsp;&nbsp;&nbsp;&nbsp;"); break;
 		default: *w++ = *r;
 		}
 		if (buf + sizeof buf - w <= 24) {
@@ -420,9 +418,9 @@ write_html(int fd)
 	encode_html(fd, mail.from, strlen(mail.from));
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
 	encode_html(fd, mail.date, strlen(mail.date));
-	dprintf(fd, "<br/>\n<hr/>\n");
+	dprintf(fd, "<br/>\n<hr/>\n<pre>");
 	encode_html(fd, mail.body, mail.length);
-	dprintf(fd, "%s", html_footer);
+	dprintf(fd, "</pre>\n%s", html_footer);
 }
 
 int
