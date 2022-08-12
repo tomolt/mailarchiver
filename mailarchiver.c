@@ -298,7 +298,7 @@ decode_base64(char *rhead, char *whead, size_t length)
 }
 
 /* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
- * that may appear in header fields. */
+ * that may appear in header fields. See RFC 2047. */
 bool
 decode_encwords(char *str)
 {
@@ -315,7 +315,7 @@ decode_encwords(char *str)
 		if (!(mark = strchr(rhead, '?'))) return false;
 		rhead = mark + 1;
 
-		if (*rhead != 'Q' && *rhead != 'B') return false;
+		if (*rhead != 'Q' && *rhead != 'q' && *rhead != 'B' && *rhead != 'b') return false;
 		encoding = *rhead++;
 		if (*rhead != '?') return false;
 		rhead++;
@@ -323,7 +323,7 @@ decode_encwords(char *str)
 		if (!(mark = strchr(rhead, '?'))) return false;
 		if (mark[1] != '=') return false;
 
-		if (encoding == 'Q') {
+		if (encoding == 'Q' || encoding == 'q') {
 			for (c = rhead; c < mark; c++) {
 				if (*c == '_') *c = ' ';
 			}
