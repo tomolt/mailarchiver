@@ -27,6 +27,11 @@
 
 #include "config.h"
 
+#define TOKEN_INIT(ptr) (struct token) { ptr, NULL, -1 }
+#define TOKEN_ATOM  256
+#define TOKEN_END     0
+#define TOKEN_ERROR  -1
+
 struct mail {
 	char *subject;
 	char *from;
@@ -34,6 +39,12 @@ struct mail {
 	char *body;
 	size_t length; /* of the body */
 	char tenc; /* transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
+};
+
+struct token {
+	char *rhead;
+	char *atom;
+	int   evicted;
 };
 
 static struct mail mail;
@@ -72,7 +83,7 @@ is_key(char c)
 static inline bool
 is_special(char c)
 {
-	return strchr("<>[]:;@\\,", c) != NULL;
+	return c && (strchr("<>[]:;@\\,", c) != NULL);
 }
 
 static inline bool
@@ -81,7 +92,7 @@ is_atom(char c)
 	if (c >= 'a' && c <= 'z') return true;
 	if (c >= 'A' && c <= 'Z') return true;
 	if (c >= '0' && c <= '9') return true;
-	return strchr("!#$%&'*+-/=?^_`{|}~.", c) != NULL;
+	return c && (strchr("!#$%&'*+-/=?^_`{|}~.", c) != NULL);
 }
 
 bool
@@ -153,67 +164,71 @@ collapse_ws(char *str)
 	*whead = '\0';
 }
 
-bool
-tokenize(char **pointer, char **token)
+static bool
+skip_comment(char **pointer, int depth)
 {
-	char *cursor;
-	int depth;
-
-	cursor = *pointer;
-
-	/* skip ws and comments */
-	for (;;) {
-		if (is_ws(*cursor)) {
-			cursor++;
-		} else if (*cursor == '(') {
-			depth = 1;
-			while (depth) {
-				switch (*cursor++) {
-				case '\0': return false;
-				case '(': depth++; break;
-				case ')': depth--; break;
-				case '\\': if (!*cursor++) return false;
-				}
-			}
-		} else {
-			break;
+	char *cursor = *pointer;
+	do {
+		switch (*cursor++) {
+		case '\0': return false;
+		case '\\': if (!*cursor++) return false;
+		case '(':  depth++; break;
+		case ')':  depth--; break;
 		}
+	} while (depth);
+	*pointer = cursor;
+	return true;
+}
+
+int
+tokenize(struct token *token)
+{
+	char first;
+
+restart:
+	first = token->evicted < 0 ? *token->rhead++ : token->evicted;
+	token->evicted = -1;
+
+	if (!first) return TOKEN_END;
+	if (is_ws(first)) goto restart;
+	if (first == '(') {
+		if (!skip_comment(&token->rhead, 1))
+			return TOKEN_ERROR;
+		goto restart;
 	}
-	if (!*cursor) return false;
-	
+
 	/* special char */
-	if (is_special(*cursor)) {
-		*token = cursor;
-		*pointer = cursor + 1;
-		return true;
-	}
+	if (is_special(first))
+		return first;
 
 	/* quoted string */
-	if (*cursor == '"') {
-		cursor++;
-		*token = cursor;
+	if (first == '"') {
+		token->atom = token->rhead;
 		for (;;) {
-			switch (*cursor++) {
-			case '\0': return false;
+			switch (*token->rhead++) {
+			case '\0': return TOKEN_ERROR;
+			case '\\': if (!*token->rhead++) return TOKEN_ERROR;
 			case '"':
-				   *cursor = '\0';
-				   collapse_ws(*token);
-				   *pointer = cursor + 1;
-				   return true;
-			case '\\': if (!*cursor++) return false;
+				   *(token->rhead-1) = '\0';
+				   collapse_ws(token->atom);
+				   return TOKEN_ATOM;
 			}
 		}
 	}
 
 	/* atom */
-	if (is_atom(*cursor)) {
-		*token = cursor;
-		do cursor++; while (is_atom(*cursor));
-		*pointer = cursor;
-		return true;
+	if (is_atom(first)) {
+		/* no two atoms can come directly one after another, meaning
+		 * first is still in memory, i.e. hasn't been evicted. */
+		token->atom = token->rhead - 1;
+		while (is_atom(*token->rhead)) token->rhead++;
+		/* evict char after atom to make space for NUL terminator. */
+		token->evicted = *token->rhead;
+		*token->rhead = '\0';
+		return TOKEN_ATOM;
 	}
 
-	return false;
+	return TOKEN_ERROR;
 }
 
 char *
@@ -333,7 +348,7 @@ decode_encwords(char *str)
 bool
 process_field(char *key, char *value)
 {
-	char *pointer, *token;
+	struct token token;
 
 	if (!strcasecmp(key, "From")) {
 		collapse_ws(value);
@@ -348,17 +363,17 @@ process_field(char *key, char *value)
 		if (!decode_encwords(value)) return false;
 		mail.date = value;
 	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
-		pointer = value;
-		if (!tokenize(&pointer, &token)) return false;
-		if (!strcasecmp(token, "7bit")) {
+		token = TOKEN_INIT(value);
+		if (tokenize(&token) != TOKEN_ATOM) return false;
+		if (!strcasecmp(token.atom, "7bit")) {
 			mail.tenc = '\0';
-		} else if (!strcasecmp(token, "8bit")) {
+		} else if (!strcasecmp(token.atom, "8bit")) {
 			mail.tenc = '\0';
-		} else if (!strcasecmp(token, "binary")) {
+		} else if (!strcasecmp(token.atom, "binary")) {
 			mail.tenc = '\0';
-		} else if (!strcasecmp(token, "quoted-printable")) {
+		} else if (!strcasecmp(token.atom, "quoted-printable")) {
 			mail.tenc = 'Q';
-		} else if (!strcasecmp(token, "base64")) {
+		} else if (!strcasecmp(token.atom, "base64")) {
 			mail.tenc = 'B';
 		} else {
 			return false;
