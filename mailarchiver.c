@@ -25,6 +25,7 @@
 #include <strings.h>
 #include <errno.h>
 
+#include "arg.h"
 #include "config.h"
 
 #define TOKEN_INIT(ptr) (struct token) { ptr, NULL, -1 }
@@ -49,6 +50,8 @@ struct token {
 	char *atom;
 	int   evicted;
 };
+
+char *argv0;
 
 static char *mail_path;
 static struct mail mail;
@@ -478,24 +481,33 @@ write_html(int fd)
 	dprintf(fd, "</pre>\n%s", html_footer);
 }
 
+static void
+usage(void)
+{
+	fprintf(stderr, "usage: %s [-m] mail-file\n", argv0);
+}
+
 int
 main(int argc, char **argv)
 {
 	int fd;
 	struct stat meta;
-	char *text, *ptr, **arg;
+	char *text, *ptr;
 	bool do_print_meta = false;
 
-	if (argc < 2) return 1;
-
-	arg = &argv[1];
-	if (strcmp(*arg, "-m") == 0) {
+	ARGBEGIN {
+	case 'm':
 		do_print_meta = true;
-		++arg;
+		break;
+	default:
+		usage();
+		exit(1);
+	} ARGEND
+	if (argc != 1) {
+		usage();
+		exit(1);
 	}
-	mail_path = *arg++;
-
-	if (*arg) die("excess arguments\n");
+	mail_path = *argv++;
 
 	fd = open(mail_path, O_RDONLY);
 	if (fd < 0) die("cannot open '%s': %s", mail_path, strerror(errno));

@@ -35,5 +35,5 @@ mailarchiver: $(OBJ)
 config.h:
 	cp config.def.h $@
 
-$(OBJ): config.h config.mk
+$(OBJ): arg.h config.h config.mk
 
