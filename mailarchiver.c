@@ -86,13 +86,14 @@ memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 static inline bool
 is_ws(char c)
 {
-	/* TODO cover all types of whitespace allowed in mail header */
+	/* TODO Cover all types of whitespace allowed in mail header. */
 	return c == ' ' || c == '\t' || c == '\r' || c == '\n';
 }
 
 static inline bool
 is_key(char c)
 {
+	/* There's likely even more allowed characters than this. */
 	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '-' || c == '_';
 }
 
@@ -164,17 +165,16 @@ parse_header(char *header, bool (*field_cb)(char *key, char *value))
 void
 collapse_ws(char *str)
 {
-	char *src, *dst;
-	src = dst = str;
+	char *src = str, *dst = str;
 	while (is_ws(*src)) src++;
 	while (*src) {
 		*dst++ = *src++;
 		if (is_ws(*src)) {
-			while (is_ws(*src)) src++;
+			do src++; while (is_ws(*src));
 			if (*src) *dst++ = ' ';
 		}
 	}
-	*dst = 0;
+	*dst = '\0';
 }
 
 static bool
@@ -232,7 +232,7 @@ restart:
 	/* atom */
 	if (is_atom(first)) {
 		/* no two atoms can come directly one after another, meaning
-		 * first is still in memory, i.e. hasn't been evicted. */
+		 * 'first' is still in memory, i.e. hasn't been evicted. */
 		token->atom = token->rhead - 1;
 		while (is_atom(*token->rhead)) token->rhead++;
 		/* evict char after atom to make space for NUL terminator. */
@@ -256,31 +256,27 @@ decode_hex_digit(char c)
 char *
 decode_qprintable(char *rhead, char *whead, size_t length)
 {
-	char *eq;
+	char *end = rhead + length, *eq;
 	int lo, hi;
 
-	while ((eq = memchr(rhead, '=', length))) {
+	while ((eq = memchr(rhead, '=', end - rhead))) {
 		memmove(whead, rhead, eq - rhead);
 		whead  += eq - rhead;
-		length -= eq - rhead + 1;
 		rhead   = eq + 1;
 
-		if (length >= 2
+		if (end - rhead >= 2
 		&& (hi = decode_hex_digit(rhead[0])) >= 0
 		&& (lo = decode_hex_digit(rhead[1])) >= 0) {
 			*whead++ = hi * 16 + lo;
 			rhead  += 2;
-			length -= 2;
-		} else if (length >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
+		} else if (end - rhead >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
 			rhead  += 2;
-			length -= 2;
-		} else if (length >= 1 && rhead[0] == '\n') {
+		} else if (end - rhead >= 1 && rhead[0] == '\n') {
 			rhead  += 1;
-			length -= 1;
 		} else return NULL;
 	}
-	memmove(whead, rhead, length);
-	whead += length;
+	memmove(whead, rhead, end - rhead);
+	whead += end - rhead;
 	return whead;
 }
 
@@ -298,18 +294,15 @@ decode_base64_digit(char c)
 char *
 decode_base64(char *rhead, char *whead, size_t length)
 {
-	/* This implementation is terribly inefficient, but it should suffice for now. */
+	/* This implementation is inefficient, but it will suffice for now. */
 
-	unsigned long value;
-	int digit;
-	int bits;
+	char *end = rhead + length;
+	unsigned long value = 0;
+	int digit, bits = 0;
 
-	value = 0;
-	bits = 0;
-	while (length && *rhead != '=') {
+	while (rhead < end && *rhead != '=') {
 		if (is_ws(*rhead)) {
 			rhead++;
-			length--;
 			continue;
 		}
 		digit = decode_base64_digit(*rhead);
@@ -323,7 +316,6 @@ decode_base64(char *rhead, char *whead, size_t length)
 			value &= (1u << bits) - 1u;
 		}
 		rhead++;
-		length--;
 	}
 	return whead;
 }
@@ -423,6 +415,14 @@ process_field(char *key, char *value)
 }
 
 void
+write_meta(int fd)
+{
+	dprintf(fd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+		mail_path, mail.message_id, mail.date, mail.from, mail.to,
+		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
+}
+
+void
 encode_html(int fd, char *mem, size_t length)
 {
 	char buf[4096];
@@ -453,14 +453,6 @@ encode_html(int fd, char *mem, size_t length)
 		}
 	}
 	if (w > buf) write(fd, buf, w - buf);
-}
-
-static void
-write_meta(int fd)
-{
-	dprintf(fd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		mail_path, mail.message_id, mail.date, mail.from, mail.to,
-		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
 }
 
 void
