@@ -1,5 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 
+#define MAX_FILENAME_LENGTH 256
+
 static const char *html_header1 =
 	"<!DOCTYPE html>\n"
 	"<html>\n"

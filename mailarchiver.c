@@ -24,6 +24,7 @@
 #include <unistd.h>
 #include <strings.h>
 #include <errno.h>
+#include <dirent.h>
 
 #include "arg.h"
 #include "config.h"
@@ -53,8 +54,8 @@ struct token {
 
 char *argv0;
 
-static char *mail_path;
 static struct mail mail;
+static bool do_print_meta;
 
 void
 die(const char *format, ...)
@@ -268,11 +269,11 @@ decode_qprintable(char *rhead, char *whead, size_t length)
 		&& (hi = decode_hex_digit(rhead[0])) >= 0
 		&& (lo = decode_hex_digit(rhead[1])) >= 0) {
 			*whead++ = hi * 16 + lo;
-			rhead  += 2;
+			rhead += 2;
 		} else if (end - rhead >= 2 && rhead[0] == '\r' && rhead[1] == '\n') {
-			rhead  += 2;
+			rhead += 2;
 		} else if (end - rhead >= 1 && rhead[0] == '\n') {
-			rhead  += 1;
+			rhead += 1;
 		} else return NULL;
 	}
 	memmove(whead, rhead, end - rhead);
@@ -325,9 +326,8 @@ decode_base64(char *rhead, char *whead, size_t length)
 bool
 decode_encwords(char *str)
 {
-	char *rhead, *whead, *mark;
+	char *rhead, *whead, *mark, *c;
 	char encoding;
-	char *c;
 
 	rhead = whead = str;
 	while ((mark = strstr(rhead, "=?"))) {
@@ -415,10 +415,10 @@ process_field(char *key, char *value)
 }
 
 void
-write_meta(int fd)
+write_meta(int fd, const char *msgpath)
 {
 	dprintf(fd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		mail_path, mail.message_id, mail.date, mail.from, mail.to,
+		msgpath, mail.message_id, mail.date, mail.from, mail.to,
 		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
 }
 
@@ -456,8 +456,20 @@ encode_html(int fd, char *mem, size_t length)
 }
 
 void
-write_html(int fd)
+generate_html(const char *uniq)
 {
+	char tmppath[MAX_FILENAME_LENGTH];
+	char wwwpath[MAX_FILENAME_LENGTH];
+	int fd;
+
+	strcpy(tmppath, "tmp_www_XXXXXX");
+	if ((fd = mkstemp(tmppath)) < 0)
+		die("cannot create temporary file: %s", strerror(errno));
+	if (chmod(tmppath, 0644) < 0)
+		die("chmod(): %s", strerror(errno));
+	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
+		die("file path is too long.");
+
 	dprintf(fd, "%s", html_header1);
 	encode_html(fd, mail.subject, strlen(mail.subject));
 	dprintf(fd, "%s", html_header2);
@@ -471,6 +483,10 @@ write_html(int fd)
 	dprintf(fd, "<br/>\n<hr/>\n<pre>");
 	encode_html(fd, mail.body, mail.length);
 	dprintf(fd, "</pre>\n%s", html_footer);
+
+	close(fd);
+	if (rename(tmppath, wwwpath) < 0)
+		die("rename(): %s", strerror(errno));
 }
 
 static void
@@ -479,14 +495,93 @@ usage(void)
 	fprintf(stderr, "usage: %s [-m] mail-file\n", argv0);
 }
 
-int
-main(int argc, char **argv)
+bool
+process_msg(const char *msgpath, const char *uniq)
 {
 	int fd;
 	struct stat meta;
 	char *text, *ptr;
-	bool do_print_meta = false;
 
+	memset(&mail, 0, sizeof mail);
+
+	if ((fd = open(msgpath, O_RDONLY)) < 0)
+		die("cannot open '%s': %s", msgpath, strerror(errno));
+
+	if (fstat(fd, &meta) < 0)
+		die("cannot stat '%s': %s", msgpath, strerror(errno));
+
+	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
+	if (text == MAP_FAILED)
+		die("mmap: %s", strerror(errno));
+	close(fd);
+
+	if (!split_header_from_body(text, meta.st_size, &mail.body))
+		return false;
+	mail.length = meta.st_size - (mail.body - text);
+
+	if (!parse_header(text, process_field))
+		return false;
+
+	if (do_print_meta) {
+		write_meta(1, msgpath);
+		return true;
+	}
+
+	switch (mail.tenc) {
+	case 'Q':
+		ptr = decode_qprintable(mail.body, mail.body, mail.length);
+		if (!ptr) return false;
+		mail.length = ptr - mail.body;
+		break;
+	
+	case 'B':
+		ptr = decode_base64(mail.body, mail.body, mail.length);
+		if (!ptr) return false;
+		mail.length = ptr - mail.body;
+		break;
+	}
+
+	generate_html(uniq);
+
+	munmap(text, meta.st_size);
+	return true;
+}
+
+void
+process_new_dir(void)
+{
+	DIR *dir;
+	struct dirent *ent;
+	char newpath[MAX_FILENAME_LENGTH];
+	char curpath[MAX_FILENAME_LENGTH];
+
+	if (!(dir = opendir("new")))
+		die("cannot open directory 'new': %s", strerror(errno));
+
+	while ((errno = 0, ent = readdir(dir))) {
+		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
+			continue;
+
+		if (snprintf(newpath, MAX_FILENAME_LENGTH, "new/%s", ent->d_name) >= MAX_FILENAME_LENGTH)
+			die("file path is too long.");
+		if (process_msg(newpath, ent->d_name)) {
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,E", ent->d_name) >= MAX_FILENAME_LENGTH)
+				die("file path is too long.");
+		} else {
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,S", ent->d_name) >= MAX_FILENAME_LENGTH)
+				die("file path is too long.");
+		}
+		rename(newpath, curpath);
+	}
+	if (errno)
+		die("readdir(): %s", strerror(errno));
+
+	closedir(dir);
+}
+
+int
+main(int argc, char **argv)
+{
 	ARGBEGIN {
 	case 'm':
 		do_print_meta = true;
@@ -495,51 +590,17 @@ main(int argc, char **argv)
 		usage();
 		exit(1);
 	} ARGEND
-	if (argc != 1) {
+	if (argc) {
+		if (chdir(*argv) < 0)
+			die("cannot go to directory: %s", strerror(errno));
+		argc--, argv++;
+	}
+	if (argc) {
 		usage();
 		exit(1);
 	}
-	mail_path = *argv++;
 
-	fd = open(mail_path, O_RDONLY);
-	if (fd < 0) die("cannot open '%s': %s", mail_path, strerror(errno));
-
-	if (fstat(fd, &meta) < 0) die("cannot stat '%s': %s", mail_path, strerror(errno));
-
-	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
-	if (text == MAP_FAILED)
-		die("mmap: %s", strerror(errno));
-	close(fd);
-
-	if (!split_header_from_body(text, meta.st_size, &mail.body))
-		die("cannot discern mail header from body");
-	mail.length = meta.st_size - (mail.body - text);
-
-	if (!parse_header(text, process_field))
-		die("cannot parse mail header");
-
-	if (do_print_meta) {
-		write_meta(1);
-		return 0;
-	}
-
-	switch (mail.tenc) {
-	case 'Q':
-		ptr = decode_qprintable(mail.body, mail.body, mail.length);
-		if (!ptr) die("cannot decode mail contents");
-		mail.length = ptr - mail.body;
-		break;
-	
-	case 'B':
-		ptr = decode_base64(mail.body, mail.body, mail.length);
-		if (!ptr) die("cannot decode mail contents");
-		mail.length = ptr - mail.body;
-		break;
-	}
-
-	write_html(1);
-
-	munmap(text, meta.st_size);
+	process_new_dir();
 
 	return 0;
 }

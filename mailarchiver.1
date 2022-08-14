@@ -7,21 +7,26 @@
 .Sh SYNOPSIS
 .Nm
 .Op Fl m
-.Ar mail-file
+.Ar [maildir]
 .Sh DESCRIPTION
 At some point,
 .Nm
 might become a fully fledged mailing list web archiver.
 For the time being, it is merely a work-in-progress.
-.sp
+.Pp
 Executing
 .Nm
-with a file containing a mail message as the argument
-will print a formatted HTML version of the message to stdout.
+on a maildir-formatted directory will process messages in
+.Pa new/ ,
+convert them to HTML websites in
+.Pa www/ ,
+and move the processed messages to
+.Pa cur/ .
 .Pp
 The option
 .Fl m
-instead prints the following header fields as a single line of tab-separated values:
+instead prints the following header fields as
+a single line of tab-separated values:
 .Dl [File path] [Message-ID] [Date] [From] [To] [In-Reply-To] [Subject]
 In-Reply-To and Subject may be empty.
 .Sh AUTHORS

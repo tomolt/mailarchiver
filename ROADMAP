@@ -4,8 +4,7 @@ This document is intended to serve as a rough overview of what needs to be done.
 Feel free to deviate from it for any reason.
 
 ## v0.2
-- Understand Maildir. Move from new/ to cur/. Batch process multiple mails at once,
-  it's much faster than restarting the process. Option to rescan cur/.
+- Option to rescan cur/.
 - Manage a cache file. Create if neccessary, then Lock, append, unlock.
 - Generating an index site. Can be a separate executable reading from a cache file.
 
