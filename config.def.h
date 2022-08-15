@@ -2,6 +2,8 @@
 
 #define MAX_FILENAME_LENGTH 256
 
+static const char *metacache = "archiver-metacache";
+
 static const char *html_header1 =
 	"<!DOCTYPE html>\n"
 	"<html>\n"

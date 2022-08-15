@@ -55,7 +55,7 @@ struct token {
 char *argv0;
 
 static struct mail mail;
-static bool do_print_meta;
+static int cachefd;
 
 void
 die(const char *format, ...)
@@ -415,11 +415,20 @@ process_field(char *key, char *value)
 }
 
 void
-write_meta(int fd, const char *msgpath)
+update_metacache(const char *msgpath)
 {
-	dprintf(fd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
+	/* TODO handle fcntl EINTR */
+	struct flock lock = { 0 };
+	lock.l_type   = F_WRLCK;
+	lock.l_whence = SEEK_SET;
+	if (fcntl(cachefd, F_SETLKW, &lock) < 0)
+		die("fcntl(): %s", strerror(errno));
+	dprintf(cachefd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		msgpath, mail.message_id, mail.date, mail.from, mail.to,
 		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
+	lock.l_type = F_UNLCK;
+	if (fcntl(cachefd, F_SETLK, &lock) < 0)
+		die("fcntl(): %s", strerror(errno));
 }
 
 void
@@ -465,7 +474,7 @@ generate_html(const char *uniq)
 	strcpy(tmppath, "tmp_www_XXXXXX");
 	if ((fd = mkstemp(tmppath)) < 0)
 		die("cannot create temporary file: %s", strerror(errno));
-	if (chmod(tmppath, 0644) < 0)
+	if (chmod(tmppath, 0640) < 0)
 		die("chmod(): %s", strerror(errno));
 	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
 		die("file path is too long.");
@@ -522,11 +531,6 @@ process_msg(const char *msgpath, const char *uniq)
 	if (!parse_header(text, process_field))
 		return false;
 
-	if (do_print_meta) {
-		write_meta(1, msgpath);
-		return true;
-	}
-
 	switch (mail.tenc) {
 	case 'Q':
 		ptr = decode_qprintable(mail.body, mail.body, mail.length);
@@ -542,6 +546,7 @@ process_msg(const char *msgpath, const char *uniq)
 	}
 
 	generate_html(uniq);
+	update_metacache(msgpath);
 
 	munmap(text, meta.st_size);
 	return true;
@@ -565,10 +570,10 @@ process_new_dir(void)
 		if (snprintf(newpath, MAX_FILENAME_LENGTH, "new/%s", ent->d_name) >= MAX_FILENAME_LENGTH)
 			die("file path is too long.");
 		if (process_msg(newpath, ent->d_name)) {
-			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,E", ent->d_name) >= MAX_FILENAME_LENGTH)
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,a", ent->d_name) >= MAX_FILENAME_LENGTH)
 				die("file path is too long.");
 		} else {
-			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,S", ent->d_name) >= MAX_FILENAME_LENGTH)
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,e", ent->d_name) >= MAX_FILENAME_LENGTH)
 				die("file path is too long.");
 		}
 		rename(newpath, curpath);
@@ -583,9 +588,6 @@ int
 main(int argc, char **argv)
 {
 	ARGBEGIN {
-	case 'm':
-		do_print_meta = true;
-		break;
 	default:
 		usage();
 		exit(1);
@@ -600,8 +602,12 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
+	if ((cachefd = open(metacache, O_CREAT | O_RDWR | O_APPEND, 0640)) < 0)
+		die("cannot open meta-cache file.");
+
 	process_new_dir();
 
+	close(cachefd);
 	return 0;
 }
 
