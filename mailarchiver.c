@@ -149,10 +149,8 @@ parse_header(char *header, bool (*field_cb)(char *key, char *value))
 
 		value = cursor;
 		do {
-			while (*cursor != '\n') {
-				if (!*cursor) return false;
-				cursor++;
-			}
+			if (!(cursor = strchr(cursor, '\n')))
+				return false;
 			cursor++;
 		} while (is_ws(*cursor) && *cursor != '\n');
 		*(cursor-1) = '\0';
