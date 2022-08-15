@@ -79,7 +79,7 @@ memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 	for (chr = (BYTEP) needle; chr < (BYTEP) needle + needlelen; chr++)
 		bitfield[*chr / UBITS] |= 1u << (*chr % UBITS);
 	for (chr = (BYTEP) hay; chr < (BYTEP) hay + haylen; chr++)
-		if ((bitfield[*chr / UBITS] >> (*chr % UBITS)) & 1u) break;
+		if (bitfield[*chr / UBITS] & (1u << (*chr % UBITS))) break;
 #undef UBITS
 	return chr - (BYTEP) hay;
 }
@@ -499,7 +499,7 @@ generate_html(const char *uniq)
 static void
 usage(void)
 {
-	fprintf(stderr, "usage: %s [-m] mail-file\n", argv0);
+	fprintf(stderr, "usage: %s [maildir]\n", argv0);
 }
 
 bool
