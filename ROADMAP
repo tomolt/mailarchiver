@@ -5,7 +5,6 @@ Feel free to deviate from it for any reason.
 
 ## v0.2
 - Option to rescan cur/.
-- Manage a cache file. Create if neccessary, then Lock, append, unlock.
 - Generating an index site. Can be a separate executable reading from a cache file.
 
 ## v0.3

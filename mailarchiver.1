@@ -6,7 +6,6 @@
 .Nd mailing list web archiver
 .Sh SYNOPSIS
 .Nm
-.Op Fl m
 .Ar [maildir]
 .Sh DESCRIPTION
 At some point,
@@ -23,10 +22,10 @@ convert them to HTML websites in
 and move the processed messages to
 .Pa cur/ .
 .Pp
-The option
-.Fl m
-instead prints the following header fields as
-a single line of tab-separated values:
+Additionally,
+.Nm
+accumulates metadata information about processed messages in a cache file.
+This cache file is in tab-separated-value format and has the following structure:
 .Dl [File path] [Message-ID] [Date] [From] [To] [In-Reply-To] [Subject]
 In-Reply-To and Subject may be empty.
 .Sh AUTHORS
