@@ -2,7 +2,7 @@
 
 include config.mk
 
-BIN = smak-readmsg
+BIN = smak-readmsg smak-genindex
 SRC = $(addsuffix .c,$(BIN)) encode.c mail.c util.c
 OBJ = ${SRC:.c=.o}
 MAN = $(addsuffix .1,$(BIN))
@@ -33,6 +33,9 @@ uninstall:
 smak-readmsg: smak-readmsg.o encode.o mail.o util.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
+smak-genindex: smak-genindex.o encode.o util.o
+	$(LD) $(LDFLAGS) -o $@ $^
+
 .c.o:
 	$(CC) $(CFLAGS) $(CPPFLAGS) -c $<
 
@@ -45,4 +48,5 @@ encode.o: encode.h
 mail.o: mail.h
 util.o: util.h
 smak-readmsg.o: arg.h config.h encode.h mail.h util.h
+smak-genindex.o: config.h encode.h util.h
 
