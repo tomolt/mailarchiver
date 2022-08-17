@@ -16,7 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
-#include <stdarg.h>
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -27,6 +26,7 @@
 #include <dirent.h>
 
 #include "arg.h"
+#include "util.h"
 #include "config.h"
 
 #define TOKEN_INIT(ptr) (struct token) { ptr, NULL, -1 }
@@ -56,33 +56,6 @@ char *argv0;
 
 static struct mail mail;
 static int cachefd;
-
-void
-die(const char *format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	vfprintf(stderr, format, ap);
-	va_end(ap);
-	fputc('\n', stderr);
-	exit(1);
-}
-
-/* Like strcspn(), but takes explicit maximum lengths instead of relying on NUL termination. */
-size_t
-memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
-{
-#define UBITS (8 * sizeof (unsigned))
-	typedef const unsigned char *BYTEP;
-	BYTEP chr;
-	unsigned bitfield[256 / UBITS] = { 0 };
-	for (chr = (BYTEP) needle; chr < (BYTEP) needle + needlelen; chr++)
-		bitfield[*chr / UBITS] |= 1u << (*chr % UBITS);
-	for (chr = (BYTEP) hay; chr < (BYTEP) hay + haylen; chr++)
-		if (bitfield[*chr / UBITS] & (1u << (*chr % UBITS))) break;
-#undef UBITS
-	return chr - (BYTEP) hay;
-}
 
 static inline bool
 is_ws(char c)
@@ -496,12 +469,6 @@ generate_html(const char *uniq)
 		die("rename(): %s", strerror(errno));
 }
 
-static void
-usage(void)
-{
-	fprintf(stderr, "usage: %s [maildir]\n", argv0);
-}
-
 bool
 process_msg(const char *msgpath, const char *uniq)
 {
@@ -580,6 +547,12 @@ process_new_dir(void)
 		die("readdir(): %s", strerror(errno));
 
 	closedir(dir);
+}
+
+static void
+usage(void)
+{
+	fprintf(stderr, "usage: %s [maildir]\n", argv0);
 }
 
 int
