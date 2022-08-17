@@ -18,6 +18,7 @@
 
 #include "arg.h"
 #include "mail.h"
+#include "encode.h"
 #include "util.h"
 #include "config.h"
 
@@ -102,39 +103,6 @@ update_metacache(const char *msgpath)
 	lock.l_type = F_UNLCK;
 	if (fcntl(cachefd, F_SETLK, &lock) < 0)
 		die("fcntl(): %s", strerror(errno));
-}
-
-void
-encode_html(int fd, char *mem, size_t length)
-{
-	char buf[4096];
-	char *w = buf;
-	size_t idx = 0, run;
-
-	for (;;) {
-		run = memcspn(mem + idx, length - idx, "<>&\"\0", 5);
-		if ((w - buf) + run > sizeof buf - 16) {
-			write(fd, buf, w - buf);
-			w = buf;
-		}
-		if (run > sizeof buf - 16) {
-			write(fd, mem + idx, run);
-		} else {
-			memcpy(w, mem + idx, run);
-			w += run;
-		}
-		idx += run;
-		if (idx == length) break;
-
-		switch (mem[idx++]) {
-		case '<': w = stpcpy(w, "&lt;"); break;
-		case '>': w = stpcpy(w, "&gt;"); break;
-		case '&': w = stpcpy(w, "&amp;"); break;
-		case '"': w = stpcpy(w, "&quot;"); break;
-		default:  w = stpcpy(w, "?");
-		}
-	}
-	if (w > buf) write(fd, buf, w - buf);
 }
 
 void

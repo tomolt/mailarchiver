@@ -3,7 +3,7 @@
 include config.mk
 
 BIN = smak-readmsg
-SRC = $(addsuffix .c,$(BIN)) util.c mail.c
+SRC = $(addsuffix .c,$(BIN)) encode.c mail.c util.c
 OBJ = ${SRC:.c=.o}
 MAN = $(addsuffix .1,$(BIN))
 
@@ -30,7 +30,7 @@ uninstall:
 		rm -f "$(DESTDIR)$(MANPREFIX)/man1/$b.1"	\
 	done
 
-smak-readmsg: smak-readmsg.o util.o mail.o
+smak-readmsg: smak-readmsg.o encode.o mail.o util.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 .c.o:
@@ -39,5 +39,10 @@ smak-readmsg: smak-readmsg.o util.o mail.o
 config.h:
 	cp config.def.h $@
 
-$(OBJ): arg.h config.h config.mk
+$(OBJ): config.mk
+
+encode.o: encode.h
+mail.o: mail.h
+util.o: util.h
+smak-readmsg.o: arg.h config.h encode.h mail.h util.h
 
