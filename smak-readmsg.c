@@ -96,13 +96,13 @@ update_metacache(const char *msgpath)
 	lock.l_type   = F_WRLCK;
 	lock.l_whence = SEEK_SET;
 	if (fcntl(cachefd, F_SETLKW, &lock) < 0)
-		die("fcntl(): %s", strerror(errno));
+		die("fcntl():");
 	dprintf(cachefd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
 		msgpath, mail.message_id, mail.date, mail.from, mail.to,
 		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
 	lock.l_type = F_UNLCK;
 	if (fcntl(cachefd, F_SETLK, &lock) < 0)
-		die("fcntl(): %s", strerror(errno));
+		die("fcntl():");
 }
 
 void
@@ -114,9 +114,9 @@ generate_html(const char *uniq)
 
 	strcpy(tmppath, "tmp_www_XXXXXX");
 	if ((fd = mkstemp(tmppath)) < 0)
-		die("cannot create temporary file: %s", strerror(errno));
+		die("cannot create temporary file:");
 	if (chmod(tmppath, 0640) < 0)
-		die("chmod(): %s", strerror(errno));
+		die("chmod():");
 	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
 		die("file path is too long.");
 
@@ -136,7 +136,7 @@ generate_html(const char *uniq)
 
 	close(fd);
 	if (rename(tmppath, wwwpath) < 0)
-		die("rename(): %s", strerror(errno));
+		die("rename():");
 }
 
 bool
@@ -149,14 +149,14 @@ process_msg(const char *msgpath, const char *uniq)
 	memset(&mail, 0, sizeof mail);
 
 	if ((fd = open(msgpath, O_RDONLY)) < 0)
-		die("cannot open '%s': %s", msgpath, strerror(errno));
+		die("cannot open '%s':", msgpath);
 
 	if (fstat(fd, &meta) < 0)
-		die("cannot stat '%s': %s", msgpath, strerror(errno));
+		die("cannot stat '%s':", msgpath);
 
 	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (text == MAP_FAILED)
-		die("mmap: %s", strerror(errno));
+		die("mmap:");
 	close(fd);
 
 	if (!split_header_from_body(text, meta.st_size, &mail.body))
@@ -196,7 +196,7 @@ process_new_dir(void)
 	char curpath[MAX_FILENAME_LENGTH];
 
 	if (!(dir = opendir("new")))
-		die("cannot open directory 'new': %s", strerror(errno));
+		die("cannot open directory 'new':");
 
 	while ((errno = 0, ent = readdir(dir))) {
 		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
@@ -214,7 +214,7 @@ process_new_dir(void)
 		rename(newpath, curpath);
 	}
 	if (errno)
-		die("readdir(): %s", strerror(errno));
+		die("readdir():");
 
 	closedir(dir);
 }
@@ -235,7 +235,7 @@ main(int argc, char **argv)
 	} ARGEND
 	if (argc) {
 		if (chdir(*argv) < 0)
-			die("cannot go to directory: %s", strerror(errno));
+			die("cannot go to directory:");
 		argc--, argv++;
 	}
 	if (argc) {

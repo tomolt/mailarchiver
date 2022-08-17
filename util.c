@@ -1,18 +1,27 @@
 /* See LICENSE file for copyright and license details. */
 
+#include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+
+#include <errno.h>
 
 #include "util.h"
 
 void
 die(const char *format, ...)
 {
+	int err;
 	va_list ap;
+	err = errno;
 	va_start(ap, format);
 	vfprintf(stderr, format, ap);
 	va_end(ap);
+	if (*format && format[strlen(format)-1] == ':') {
+		fputc(' ', stderr);
+		fputs(strerror(err), stderr);
+	}
 	fputc('\n', stderr);
 	exit(1);
 }

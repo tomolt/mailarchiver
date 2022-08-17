@@ -44,7 +44,7 @@ config.h:
 
 $(OBJ): config.mk
 
-encode.o: encode.h
+encode.o: encode.h util.h
 mail.o: mail.h
 util.o: util.h
 smak-readmsg.o: arg.h config.h encode.h mail.h util.h
