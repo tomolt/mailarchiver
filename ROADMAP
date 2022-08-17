@@ -3,17 +3,17 @@
 This document is intended to serve as a rough overview of what needs to be done.
 Feel free to deviate from it for any reason.
 
-## v0.2
+## v0.3
 - Option to rescan cur/.
 - Generating an index site. Can be a separate executable reading from a cache file.
 
-## v0.3
+## v0.4
 - Stricter interpretation of some mail header fields.
 - Thread navigation on index site.
 - Convert ISO 8859-1 and Windows-1251 to UTF-8.
   (Both encodings occur occasionally on the suckless mailing lists)
 
-## v0.4
+## v0.5
 - Parse & understand MIME. Separate mail bodies from attachments.
   Write out attachments separately.
 - Thread navigation on each mail HTML site.
@@ -21,7 +21,7 @@ Feel free to deviate from it for any reason.
   push the current mail back / let it stay in new/ temporarily.
   (But when to give up on it?)
 
-## v0.5
+## v0.6
 - Split index site into multiple pages. Either per-month or by fixed number of mails
   per page.
 - View per date?
@@ -30,8 +30,6 @@ Feel free to deviate from it for any reason.
 ## v1.0
 Goal: As-good as hypermail for the purposes of the suckless mailing lists.
 (Does not mean feature parity, just overall usability should be about the same!)
-
-Last chance to pick a better name!
 
 ## after v1.0
 - Generate Gopher *.gph sites

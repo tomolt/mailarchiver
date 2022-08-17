@@ -2,31 +2,35 @@
 
 include config.mk
 
-SRC = mailarchiver.c
+BIN = smak-readmsg
+SRC = $(addsuffix .c,$(BIN))
 OBJ = ${SRC:.c=.o}
+MAN = $(addsuffix .1,$(BIN))
 
 .PHONY: all clean install uninstall
 
-all: mailarchiver
+all: $(BIN)
 
 clean:
-	rm -f $(OBJ) mailarchiver
+	rm -f $(OBJ) $(BIN)
 
-install: mailarchiver
-	# executable
+install: $(BIN) $(MAN)
 	mkdir -p "$(DESTDIR)$(PREFIX)/bin"
-	cp -f mailarchiver "$(DESTDIR)$(PREFIX)/bin"
-	chmod 755 "$(DESTDIR)$(PREFIX)/bin/mailarchiver"
-	# man page
 	mkdir -p "$(DESTDIR)$(MANPREFIX)/man1"
-	cp -f mailarchiver.1 "$(DESTDIR)$(MANPREFIX)/man1"
-	chmod 644 "$(DESTDIR)$(MANPREFIX)/man1/mailarchiver.1"
+	for b in $(BIN); do					\
+		cp -f $b "$(DESTDIR)$(PREFIX)/bin"		\
+		chmod 755 "$(DESTDIR)$(PREFIX)/bin/$b"		\
+		cp -f $b.1 "$(DESTDIR)$(MANPREFIX)/man1"	\
+		chmod 644 "$(DESTDIR)$(MANPREFIX)/man1/$b.1"	\
+	done
 
 uninstall:
-	rm -f "$(DESTDIR)$(PREFIX)/bin/mailarchiver"
-	rm -f "$(DESTDIR)$(MANPREFIX)/man1/mailarchiver.1"
+	for b in $(BIN); do					\
+		rm -f "$(DESTDIR)$(PREFIX)/bin/$b"		\
+		rm -f "$(DESTDIR)$(MANPREFIX)/man1/$b.1"	\
+	done
 
-mailarchiver: $(OBJ)
+smak-readmsg: smak-readmsg.o
 	$(LD) $(LDFLAGS) -o $@ $(OBJ)
 
 .c.o:
