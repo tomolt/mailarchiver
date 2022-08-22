@@ -1,4 +1,3 @@
 config.h
 *.o
-smak-readmsg
-smak-genindex
+smak
