@@ -163,8 +163,15 @@ process_msg(const char *msgpath, const char *uniq)
 		return false;
 	mail.length = meta.st_size - (mail.body - text);
 
-	if (!parse_header(text, process_field))
-		return false;
+	{
+		char *pointer = text, *key, *value;
+		while (*pointer) {
+			if (!next_header_field(&pointer, &key, &value))
+				return false;
+			if (!process_field(key, value))
+				return false;
+		}
+	}
 
 	switch (mail.tenc) {
 	case 'Q':

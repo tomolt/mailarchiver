@@ -68,28 +68,27 @@ split_header_from_body(char *msg, size_t length, char **body)
 }
 
 bool
-parse_header(char *header, bool (*field_cb)(char *key, char *value))
+next_header_field(char **pointer, char **key, char **value)
 {
-	char *cursor = header;
-	char *key, *value;
+	char *cursor = *pointer;
 
-	while (*cursor) {
-		if (!is_key(*cursor)) return false;
-		key = cursor;
-		do cursor++; while (is_key(*cursor));
-		if (*cursor != ':') return false;
-		*cursor++ = '\0';
+	if (!*cursor) return false;
 
-		value = cursor;
-		do {
-			if (!(cursor = strchr(cursor, '\n')))
-				return false;
-			cursor++;
-		} while (is_ws(*cursor) && *cursor != '\n');
-		*(cursor-1) = '\0';
+	if (!is_key(*cursor)) return false;
+	*key = cursor;
+	do cursor++; while (is_key(*cursor));
+	if (*cursor != ':') return false;
+	*cursor++ = '\0';
 
-		if (!field_cb(key, value)) return false;
-	}
+	*value = cursor;
+	do {
+		if (!(cursor = strchr(cursor, '\n')))
+			return false;
+		cursor++;
+	} while (is_ws(*cursor) && *cursor != '\n');
+	*(cursor-1) = '\0';
+
+	*pointer = cursor;
 	return true;
 }
 

@@ -15,7 +15,7 @@ struct token {
 };
 
 bool split_header_from_body(char *msg, size_t length, char **body);
-bool parse_header(char *header, bool (*field_cb)(char *key, char *value));
+bool next_header_field(char **pointer, char **key, char **value);
 
 /* Converts each run of whitespace in str to a single space. */
 void collapse_ws(char *str);
