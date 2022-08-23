@@ -6,6 +6,7 @@
 #include <stdarg.h>
 
 #include <errno.h>
+#include <unistd.h>
 
 #include "util.h"
 
@@ -39,5 +40,21 @@ mem_cspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 	for (chr = (BYTEP) hay; chr < (BYTEP) hay + haylen; chr++)
 		if (bitfield[*chr / UBITS] & (1u << (*chr % UBITS))) break;
 	return chr - (BYTEP) hay;
+}
+
+/* same as write(), but calls die() if the write fails. Also deals with EINTR */
+ssize_t
+check_write(int fd, const void *buf, size_t n)
+{
+	ssize_t ret, w = 0;
+
+	for (w = 0; w < n; w += ret) {
+		ret = write(fd, (char *)buf + w, n - w);
+		if (ret < 0 && errno != EINTR)
+			die("write():");
+		ret = ret < 0 ? 0 : ret; /* don't increment `w` with negative value */
+	}
+
+	return w;
 }
 

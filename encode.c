@@ -17,11 +17,11 @@ encode_html(int fd, char *mem, size_t length)
 	for (;;) {
 		run = mem_cspn(mem + idx, length - idx, "<>&\"\0", 5);
 		if ((w - buf) + run > sizeof buf - 16) {
-			write(fd, buf, w - buf);
+			check_write(fd, buf, w - buf);
 			w = buf;
 		}
 		if (run > sizeof buf - 16) {
-			write(fd, mem + idx, run);
+			check_write(fd, mem + idx, run);
 		} else {
 			memcpy(w, mem + idx, run);
 			w += run;
@@ -37,6 +37,6 @@ encode_html(int fd, char *mem, size_t length)
 		default:  w = stpcpy(w, "?");
 		}
 	}
-	if (w > buf) write(fd, buf, w - buf);
+	if (w > buf) check_write(fd, buf, w - buf);
 }
 
