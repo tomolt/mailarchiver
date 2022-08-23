@@ -15,7 +15,7 @@ encode_html(int fd, char *mem, size_t length)
 	size_t idx = 0, run;
 
 	for (;;) {
-		run = memcspn(mem + idx, length - idx, "<>&\"\0", 5);
+		run = mem_cspn(mem + idx, length - idx, "<>&\"\0", 5);
 		if ((w - buf) + run > sizeof buf - 16) {
 			write(fd, buf, w - buf);
 			w = buf;

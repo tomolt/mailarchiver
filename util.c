@@ -28,9 +28,9 @@ die(const char *format, ...)
 
 /* Like strcspn(), but takes explicit maximum lengths instead of relying on NUL termination. */
 size_t
-memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
+mem_cspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 {
-#define UBITS (8 * sizeof (unsigned))
+	enum { UBITS = 8 * sizeof (unsigned) };
 	typedef const unsigned char *BYTEP;
 	BYTEP chr;
 	unsigned bitfield[256 / UBITS] = { 0 };
@@ -38,7 +38,6 @@ memcspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 		bitfield[*chr / UBITS] |= 1u << (*chr % UBITS);
 	for (chr = (BYTEP) hay; chr < (BYTEP) hay + haylen; chr++)
 		if (bitfield[*chr / UBITS] & (1u << (*chr % UBITS))) break;
-#undef UBITS
 	return chr - (BYTEP) hay;
 }
 
