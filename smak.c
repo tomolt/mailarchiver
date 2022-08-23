@@ -36,6 +36,8 @@ struct mail {
 
 char *argv0;
 
+static char *aether_base;
+static char *aether_cursor;
 static struct mail mail;
 static int cachefd;
 
@@ -253,8 +255,12 @@ main(int argc, char **argv)
 	if ((cachefd = open(metacache, O_CREAT | O_RDWR | O_APPEND, 0640)) < 0)
 		die("cannot open meta-cache file.");
 
+	aether_base = mmap(NULL, MAX_AETHER_MEMORY, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	aether_cursor = aether_base;
+
 	process_new_dir();
 
+	munmap(aether_base, MAX_AETHER_MEMORY);
 	close(cachefd);
 	return 0;
 }

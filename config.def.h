@@ -2,6 +2,12 @@
 
 #define MAX_FILENAME_LENGTH 256
 
+/* The 'aether' is a big scratch space used for temporary allocations.
+ * It is allocated via demand paging, meaning memory is only actually
+ * allocated when it is actually needed.
+ * MAX_AETHER_MEMORY specifies the maximum number of bytes in the aether. */
+#define MAX_AETHER_MEMORY (256 * 1024 * 1024)
+
 static const char *metacache = "smak-metacache";
 
 static const char *html_header1 =
