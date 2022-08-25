@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <errno.h>
 #include <unistd.h>
@@ -56,5 +57,23 @@ check_write(int fd, const void *buf, size_t n)
 	}
 
 	return w;
+}
+
+/* Similar to the GNU extension timegm(). Unlike timegm() it doesn't modify its input. */
+time_t
+mkutctime(const struct tm *tm)
+{
+	const int monstarts[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
+	time_t years, days;
+
+	days = tm->tm_mday + monstarts[tm->tm_mon];
+
+	years = tm->tm_year + 1900 - 1;
+	days += 365 * years;
+	years += tm->tm_mon > 1; /* include this years' leap day */
+	days += years/4 - years/100 + years/400; /* count leap years */
+	days -= 719527; /* subtract all days before 1970-01-01 */
+
+	return tm->tm_sec + 60 * (tm->tm_min + 60 * (tm->tm_hour + 24 * days));
 }
 
