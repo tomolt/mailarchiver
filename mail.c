@@ -128,6 +128,7 @@ int
 tokenize(struct token *token)
 {
 	char first;
+	char *whead;
 
 restart:
 	first = token->evicted < 0 ? *token->rhead++ : token->evicted;
@@ -147,15 +148,21 @@ restart:
 
 	/* quoted string */
 	if (first == '"') {
-		token->atom = token->rhead;
+		token->atom = whead = token->rhead;
 		for (;;) {
-			switch (*token->rhead++) {
+			switch (*token->rhead) {
 			case '\0': return TOKEN_ERROR;
-			case '\\': if (!*token->rhead++) return TOKEN_ERROR;
 			case '"':
-				   *(token->rhead-1) = '\0';
-				   collapse_ws(token->atom);
-				   return TOKEN_ATOM;
+				token->rhead++;
+				*whead = '\0';
+				collapse_ws(token->atom);
+				return TOKEN_ATOM;
+			case '\\':
+				token->rhead++;
+				if (!*token->rhead) return TOKEN_ERROR;
+				/* fallthrough */
+			default:
+				*whead++ = *token->rhead++;
 			}
 		}
 	}
