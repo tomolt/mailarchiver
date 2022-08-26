@@ -66,14 +66,14 @@ mkutctime(const struct tm *tm)
 	const int monstarts[] = { 0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334 };
 	time_t years, days;
 
-	days = tm->tm_mday + monstarts[tm->tm_mon];
+	days = (tm->tm_mday-1) + monstarts[tm->tm_mon];
 
-	years = tm->tm_year + 1900 - 1;
+	years = tm->tm_year + 1900;
 	days += 365 * years;
 	years += tm->tm_mon > 1; /* include this years' leap day */
 	days += years/4 - years/100 + years/400; /* count leap years */
 	days -= 719527; /* subtract all days before 1970-01-01 */
 
-	return tm->tm_sec + 60 * (tm->tm_min + 60 * (tm->tm_hour + 24 * days));
+	return tm->tm_sec + 60*(tm->tm_min + 60*(tm->tm_hour + 24*days));
 }
 

@@ -176,7 +176,7 @@ restart:
 		while (is_atom(*token->rhead)) token->rhead++;
 		/* evict char after atom to make space for NUL terminator. */
 		token->evicted = *token->rhead;
-		*token->rhead = '\0';
+		*token->rhead++ = '\0';
 		return TOKEN_ATOM;
 	}
 
@@ -341,11 +341,13 @@ parse_date(char *date, struct tm *tm)
 
 	/* day, month, year */
 	if (!read_decimal(tok.atom, 2, &tm->tm_mday)) return false;
+	if (tokenize(&tok) != TOKEN_ATOM) return false;
 	for (tm->tm_mon = 0; tm->tm_mon < 12; tm->tm_mon++) {
-		if (!strcmp(tok.atom, months[tm->tm_mon])) break;
+		if (!strcasecmp(tok.atom, months[tm->tm_mon])) break;
 	}
 	if (tm->tm_mon == 12) return false;
-	if (!parse_decimal(&tok, 2, &tm->tm_year)) return false;
+	if (!parse_decimal(&tok, 4, &tm->tm_year)) return false;
+	tm->tm_year -= 1900;
 
 	/* hour, minute */
 	if (!parse_decimal(&tok, 2, &tm->tm_hour)) return false;
@@ -364,7 +366,8 @@ parse_date(char *date, struct tm *tm)
 	}
 	if (!read_decimal(tok.atom, 4, &zone)) return false;
 	if (neg) zone = -zone;
-	tm->tm_min -= zone;
+	tm->tm_hour -= zone / 100;
+	tm->tm_min  -= zone % 100;
 
 	return tokenize(&tok) == TOKEN_END;
 }
