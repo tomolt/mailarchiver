@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 
+struct tm;
+
 #define TOKEN_INIT(ptr) (struct token) { ptr, NULL, -1 }
 #define TOKEN_ATOM  256
 #define TOKEN_END     0
@@ -27,4 +29,6 @@ char *decode_base64(char *rhead, char *whead, size_t length);
 /* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
  * that may appear in header fields. See RFC 2047. */
 bool decode_encwords(char *str);
+
+bool parse_date(char *date, struct tm *tm);
 

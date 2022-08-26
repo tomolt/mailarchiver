@@ -13,6 +13,7 @@
  */
 
 #include <string.h>
+#include <time.h>
 
 #include "mail.h"
 #include "util.h"
@@ -300,5 +301,60 @@ decode_encwords(char *str)
 	whead += strlen(rhead);
 	*whead = '\0';
 	return true;
+}
+
+static bool
+read_decimal(const char *atom, int ndigits, int *value)
+{
+	int d;
+	*value = 0;
+	for (d = 0; d < ndigits; d++) {
+		if (!(atom[d] >= '0' && atom[d] <= '9')) return false;
+		*value *= 10;
+		*value += atom[d] - '0';
+	}
+	return atom[d] == '\0';
+}
+
+static bool
+parse_decimal(struct token *tok, int ndigits, int *value)
+{
+	return tokenize(tok) == TOKEN_ATOM && read_decimal(tok->atom, ndigits, value);
+}
+
+bool
+parse_date(char *date, struct tm *tm)
+{
+	const char *months[] = {
+		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
+	struct token tok = TOKEN_INIT(date);
+	
+	/* skip over weekday name if present */
+	if (tokenize(&tok) != TOKEN_ATOM) return false;
+	if (!(tok.atom[0] >= '0' && tok.atom[0] <= '9')) {
+		if (tokenize(&tok) != ',') return false;
+		if (tokenize(&tok) != TOKEN_ATOM) return false;
+	}
+
+	/* day, month, year */
+	if (!read_decimal(tok.atom, 2, &tm->tm_mday)) return false;
+	for (tm->tm_mon = 0; tm->tm_mon < 12; tm->tm_mon++) {
+		if (!strcmp(tok.atom, months[tm->tm_mon])) break;
+	}
+	if (tm->tm_mon == 12) return false;
+	if (!parse_decimal(&tok, 2, &tm->tm_year)) return false;
+
+	/* hour, minute */
+	if (!parse_decimal(&tok, 2, &tm->tm_hour)) return false;
+	if (tokenize(&tok) != ':') return false;
+	if (!parse_decimal(&tok, 2, &tm->tm_min)) return false;
+	
+	/* second (optional) */
+	if (tokenize(&tok) == ':') {
+		if (!parse_decimal(&tok, 2, &tm->tm_sec)) return false;
+	}
+
+	return tokenize(&tok) == TOKEN_END;
 }
 
