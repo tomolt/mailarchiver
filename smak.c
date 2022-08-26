@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 
 #include <sys/stat.h>
 #include <sys/mman.h>
@@ -25,13 +26,13 @@
 struct mail {
 	char *subject;
 	char *from;
-	char *date;
 	char *to;
 	char *message_id;
 	char *in_reply_to;
 	char *body;
 	size_t length; /* of the body */
 	char tenc; /* transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
+	time_t date;
 };
 
 char *argv0;
@@ -44,6 +45,7 @@ static int cachefd;
 bool
 process_field(char *key, char *value)
 {
+	struct tm tm;
 	struct token token;
 
 	if (!strcasecmp(key, "From")) {
@@ -55,9 +57,8 @@ process_field(char *key, char *value)
 		if (!decode_encwords(value)) return false;
 		mail.subject = value;
 	} else if (!strcasecmp(key, "Date")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.date = value;
+		if (!parse_date(value, &tm)) return false;
+		mail.date = mkutctime(&tm);
 	} else if (!strcasecmp(key, "To")) {
 		collapse_ws(value);
 		if (!decode_encwords(value)) return false;
@@ -93,14 +94,16 @@ process_field(char *key, char *value)
 void
 update_metacache(const char *msgpath)
 {
+	char date[200];
 	/* TODO handle fcntl EINTR */
 	struct flock lock = { 0 };
 	lock.l_type   = F_WRLCK;
 	lock.l_whence = SEEK_SET;
 	if (fcntl(cachefd, F_SETLKW, &lock) < 0)
 		die("fcntl():");
+	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&mail.date));
 	dprintf(cachefd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		msgpath, mail.message_id, mail.date, mail.from, mail.to,
+		msgpath, mail.message_id, date, mail.from, mail.to,
 		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
 	lock.l_type = F_UNLCK;
 	if (fcntl(cachefd, F_SETLK, &lock) < 0)
@@ -112,6 +115,7 @@ generate_html(const char *uniq)
 {
 	char tmppath[MAX_FILENAME_LENGTH];
 	char wwwpath[MAX_FILENAME_LENGTH];
+	char date[200];
 	int fd;
 
 	strcpy(tmppath, "tmp_www_XXXXXX");
@@ -122,6 +126,8 @@ generate_html(const char *uniq)
 	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
 		die("file path is too long.");
 
+	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&mail.date));
+
 	dprintf(fd, "%s", html_header1);
 	encode_html(fd, mail.subject, strlen(mail.subject));
 	dprintf(fd, "%s", html_header2);
@@ -131,7 +137,7 @@ generate_html(const char *uniq)
 	dprintf(fd, "<b>From:</b> ");
 	encode_html(fd, mail.from, strlen(mail.from));
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
-	encode_html(fd, mail.date, strlen(mail.date));
+	encode_html(fd, date, strlen(date));
 	dprintf(fd, "<br/>\n<hr/>\n<pre>");
 	encode_html(fd, mail.body, mail.length);
 	dprintf(fd, "</pre>\n%s", html_footer);

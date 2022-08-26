@@ -329,6 +329,8 @@ parse_date(char *date, struct tm *tm)
 		"Jan", "Feb", "Mar", "Apr", "May", "Jun",
 		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 	struct token tok = TOKEN_INIT(date);
+	int zone;
+	bool neg = false;
 	
 	/* skip over weekday name if present */
 	if (tokenize(&tok) != TOKEN_ATOM) return false;
@@ -354,6 +356,15 @@ parse_date(char *date, struct tm *tm)
 	if (tokenize(&tok) == ':') {
 		if (!parse_decimal(&tok, 2, &tm->tm_sec)) return false;
 	}
+
+	if (tokenize(&tok) != TOKEN_ATOM) return false;
+	switch (tok.atom[0]) {
+	case '-': neg = true; /* fallthrough */
+	case '+': tok.atom++;
+	}
+	if (!read_decimal(tok.atom, 4, &zone)) return false;
+	if (neg) zone = -zone;
+	tm->tm_min -= zone;
 
 	return tokenize(&tok) == TOKEN_END;
 }
