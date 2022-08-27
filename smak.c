@@ -21,6 +21,7 @@
 #include "mail.h"
 #include "encode.h"
 #include "util.h"
+#include "smakdir.h"
 #include "config.h"
 
 struct mail {
@@ -94,20 +95,16 @@ process_field(char *key, char *value)
 void
 update_metacache(const char *msgpath)
 {
-	char date[200];
-	/* TODO handle fcntl EINTR */
-	struct flock lock = { 0 };
-	lock.l_type   = F_WRLCK;
-	lock.l_whence = SEEK_SET;
-	if (fcntl(cachefd, F_SETLKW, &lock) < 0)
-		die("fcntl():");
-	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&mail.date));
-	dprintf(cachefd, "%s\t%s\t%s\t%s\t%s\t%s\t%s\n",
-		msgpath, mail.message_id, date, mail.from, mail.to,
-		mail.in_reply_to ? mail.in_reply_to : "", mail.subject);
-	lock.l_type = F_UNLCK;
-	if (fcntl(cachefd, F_SETLK, &lock) < 0)
-		die("fcntl():");
+	char time[32];
+	const char *info[MNUMINFO];
+	snprintf(time, sizeof time, "%lld", (long long) mail.date);
+	info[MUNIQ] = msgpath;
+	info[MMSGID] = mail.message_id;
+	info[MSUBJECT] = mail.subject;
+	info[MFROM] = mail.from;
+	info[MINREPLYTO] = mail.in_reply_to;
+	info[MTIME] = time;
+	add_to_log(info);
 }
 
 void
@@ -155,6 +152,12 @@ process_msg(const char *msgpath, const char *uniq)
 	char *text, *ptr;
 
 	memset(&mail, 0, sizeof mail);
+	mail.subject = "(no subject)";
+	mail.from = "(no sender)";
+	mail.to = "(no recipient)";
+	mail.message_id = "";
+	mail.in_reply_to = "";
+	mail.date = -1;
 
 	if ((fd = open(msgpath, O_RDONLY)) < 0)
 		die("cannot open '%s':", msgpath);
