@@ -8,7 +8,7 @@
 #include "util.h"
 
 void
-encode_html(int fd, char *mem, size_t length)
+encode_html(int fd, const char *mem, size_t length)
 {
 	char buf[4096];
 	char *w = buf;

@@ -8,8 +8,6 @@
  * MAX_AETHER_MEMORY specifies the maximum number of bytes in the aether. */
 #define MAX_AETHER_MEMORY (256 * 1024 * 1024)
 
-static const char *metacache = "smak-metacache";
-
 static const char *html_header1 =
 	"<!DOCTYPE html>\n"
 	"<html>\n"

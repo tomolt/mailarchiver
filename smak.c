@@ -24,95 +24,73 @@
 #include "smakdir.h"
 #include "config.h"
 
-struct mail {
-	char *subject;
-	char *from;
-	char *to;
-	char *message_id;
-	char *in_reply_to;
-	char *body;
-	size_t length; /* of the body */
-	char tenc; /* transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
-	time_t date;
-};
-
 char *argv0;
 
 static char *aether_base;
 static char *aether_cursor;
-static struct mail mail;
-static int cachefd;
 
+/* tenc = transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
 bool
-process_field(char *key, char *value)
+process_header(char *header, const char *info[], char *tenc)
 {
-	struct tm tm;
+	char *key, *value;
 	struct token token;
+	struct tm tm;
 
-	if (!strcasecmp(key, "From")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.from = value;
-	} else if (!strcasecmp(key, "Subject")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.subject = value;
-	} else if (!strcasecmp(key, "Date")) {
-		if (!parse_date(value, &tm)) return false;
-		mail.date = mkutctime(&tm);
-	} else if (!strcasecmp(key, "To")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.to = value;
-	} else if (!strcasecmp(key, "Message-ID")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.message_id = value;
-	} else if (!strcasecmp(key, "In-Reply-To")) {
-		collapse_ws(value);
-		if (!decode_encwords(value)) return false;
-		mail.in_reply_to = value;
-	} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
-		token = TOKEN_INIT(value);
-		if (tokenize(&token) != TOKEN_ATOM) return false;
-		if (!strcasecmp(token.atom, "7bit")) {
-			mail.tenc = '\0';
-		} else if (!strcasecmp(token.atom, "8bit")) {
-			mail.tenc = '\0';
-		} else if (!strcasecmp(token.atom, "binary")) {
-			mail.tenc = '\0';
-		} else if (!strcasecmp(token.atom, "quoted-printable")) {
-			mail.tenc = 'Q';
-		} else if (!strcasecmp(token.atom, "base64")) {
-			mail.tenc = 'B';
-		} else {
+	*tenc = '\0';
+	while (*header) {
+		if (!next_header_field(&header, &key, &value))
 			return false;
+		if (!strcasecmp(key, "From")) {
+			collapse_ws(value);
+			if (!decode_encwords(value)) return false;
+			info[MFROM] = value;
+		} else if (!strcasecmp(key, "Subject")) {
+			collapse_ws(value);
+			if (!decode_encwords(value)) return false;
+			info[MSUBJECT] = value;
+		} else if (!strcasecmp(key, "Date")) {
+			if (!parse_date(value, &tm)) return false;
+			if (aether_cursor - aether_base + 32 > MAX_AETHER_MEMORY)
+				die("not enough aether memory.");
+			snprintf(aether_cursor, 32, "%lld", (long long) mkutctime(&tm));
+			info[MTIME] = aether_cursor;
+		} else if (!strcasecmp(key, "Message-ID")) {
+			collapse_ws(value);
+			if (!decode_encwords(value)) return false;
+			info[MMSGID] = value;
+		} else if (!strcasecmp(key, "In-Reply-To")) {
+			collapse_ws(value);
+			if (!decode_encwords(value)) return false;
+			info[MINREPLYTO] = value;
+		} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
+			token = TOKEN_INIT(value);
+			if (tokenize(&token) != TOKEN_ATOM) return false;
+			if (!strcasecmp(token.atom, "7bit")) {
+				*tenc = '\0';
+			} else if (!strcasecmp(token.atom, "8bit")) {
+				*tenc = '\0';
+			} else if (!strcasecmp(token.atom, "binary")) {
+				*tenc = '\0';
+			} else if (!strcasecmp(token.atom, "quoted-printable")) {
+				*tenc = 'Q';
+			} else if (!strcasecmp(token.atom, "base64")) {
+				*tenc = 'B';
+			} else {
+				return false;
+			}
 		}
 	}
 	return true;
 }
 
 void
-update_metacache(const char *msgpath)
-{
-	char time[32];
-	const char *info[MNUMINFO];
-	snprintf(time, sizeof time, "%lld", (long long) mail.date);
-	info[MUNIQ] = msgpath;
-	info[MMSGID] = mail.message_id;
-	info[MSUBJECT] = mail.subject;
-	info[MFROM] = mail.from;
-	info[MINREPLYTO] = mail.in_reply_to;
-	info[MTIME] = time;
-	add_to_log(info);
-}
-
-void
-generate_html(const char *uniq)
+generate_html(const char *uniq, const char *info[], char *body, size_t length)
 {
 	char tmppath[MAX_FILENAME_LENGTH];
 	char wwwpath[MAX_FILENAME_LENGTH];
-	char date[200];
+	time_t time;
+	char date[100];
 	int fd;
 
 	strcpy(tmppath, "tmp_www_XXXXXX");
@@ -123,20 +101,21 @@ generate_html(const char *uniq)
 	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
 		die("file path is too long.");
 
-	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&mail.date));
+	time = atoll(info[MTIME]);
+	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&time));
 
 	dprintf(fd, "%s", html_header1);
-	encode_html(fd, mail.subject, strlen(mail.subject));
+	encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
 	dprintf(fd, "%s", html_header2);
 	dprintf(fd, "<h1>");
-	encode_html(fd, mail.subject, strlen(mail.subject));
+	encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
 	dprintf(fd, "</h1>\n");
 	dprintf(fd, "<b>From:</b> ");
-	encode_html(fd, mail.from, strlen(mail.from));
+	encode_html(fd, info[MFROM], strlen(info[MFROM]));
 	dprintf(fd, "<br/>\n<b>Date:</b> ");
 	encode_html(fd, date, strlen(date));
 	dprintf(fd, "<br/>\n<hr/>\n<pre>");
-	encode_html(fd, mail.body, mail.length);
+	encode_html(fd, body, length);
 	dprintf(fd, "</pre>\n%s", html_footer);
 
 	close(fd);
@@ -147,17 +126,21 @@ generate_html(const char *uniq)
 bool
 process_msg(const char *msgpath, const char *uniq)
 {
-	int fd;
+	const char *info[MNUMINFO];
 	struct stat meta;
 	char *text, *ptr;
+	int fd;
+	char *body;
+	size_t length;
+	char tenc;
 
-	memset(&mail, 0, sizeof mail);
-	mail.subject = "(no subject)";
-	mail.from = "(no sender)";
-	mail.to = "(no recipient)";
-	mail.message_id = "";
-	mail.in_reply_to = "";
-	mail.date = -1;
+	memset(info, 0, sizeof info);
+	info[MUNIQ] = msgpath;
+	info[MSUBJECT] = "(no subject)";
+	info[MFROM] = "(no sender)";
+	info[MMSGID] = "";
+	info[MINREPLYTO] = "";
+	info[MTIME] = "-1";
 
 	if ((fd = open(msgpath, O_RDONLY)) < 0)
 		die("cannot open '%s':", msgpath);
@@ -170,36 +153,29 @@ process_msg(const char *msgpath, const char *uniq)
 		die("mmap:");
 	close(fd);
 
-	if (!split_header_from_body(text, meta.st_size, &mail.body))
+	if (!split_header_from_body(text, meta.st_size, &body))
 		return false;
-	mail.length = meta.st_size - (mail.body - text);
+	length = meta.st_size - (body - text);
 
-	{
-		char *pointer = text, *key, *value;
-		while (*pointer) {
-			if (!next_header_field(&pointer, &key, &value))
-				return false;
-			if (!process_field(key, value))
-				return false;
-		}
-	}
+	if (!process_header(text, info, &tenc))
+		return false;
 
-	switch (mail.tenc) {
+	switch (tenc) {
 	case 'Q':
-		ptr = decode_qprintable(mail.body, mail.body, mail.length);
+		ptr = decode_qprintable(body, body, length);
 		if (!ptr) return false;
-		mail.length = ptr - mail.body;
+		length = ptr - body;
 		break;
 	
 	case 'B':
-		ptr = decode_base64(mail.body, mail.body, mail.length);
+		ptr = decode_base64(body, body, length);
 		if (!ptr) return false;
-		mail.length = ptr - mail.body;
+		length = ptr - body;
 		break;
 	}
 
-	generate_html(uniq);
-	update_metacache(msgpath);
+	generate_html(uniq, info, body, length);
+	add_to_log(info);
 
 	munmap(text, meta.st_size);
 	return true;
@@ -261,16 +237,12 @@ main(int argc, char **argv)
 		exit(1);
 	}
 
-	if ((cachefd = open(metacache, O_CREAT | O_RDWR | O_APPEND, 0640)) < 0)
-		die("cannot open meta-cache file.");
-
 	aether_base = mmap(NULL, MAX_AETHER_MEMORY, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	aether_cursor = aether_base;
 
 	process_new_dir();
 
 	munmap(aether_base, MAX_AETHER_MEMORY);
-	close(cachefd);
 	return 0;
 }
 
