@@ -22,6 +22,8 @@
 #include "encode.h"
 #include "util.h"
 #include "smakdir.h"
+
+#define CONFIG_HTML
 #include "config.h"
 
 char *argv0;
