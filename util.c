@@ -43,7 +43,7 @@ mem_cspn(const char *hay, size_t haylen, const char *needle, size_t needlelen)
 	return chr - (BYTEP) hay;
 }
 
-/* same as write(), but calls die() if the write fails. Also deals with EINTR */
+/* Same as write(), but calls die() if the write fails. Also deals with EINTR */
 ssize_t
 check_write(int fd, const void *buf, size_t n)
 {
@@ -57,6 +57,22 @@ check_write(int fd, const void *buf, size_t n)
 	}
 
 	return w;
+}
+
+/* Same as read(), but calls die() if the read fails. Also deals with EINTR */
+ssize_t
+check_read(int fd, void *buf, size_t n)
+{
+	ssize_t ret, r = 0;
+
+	for (r = 0; r < n; r += ret) {
+		ret = read(fd, (char *)buf + r, n - r);
+		if (ret < 0 && errno != EINTR)
+			die("read():");
+		ret = ret < 0 ? 0 : ret; /* don't increment `r` with negative value */
+	}
+
+	return r;
 }
 
 /* Similar to the GNU extension timegm(). Unlike timegm() it doesn't modify its input. */
