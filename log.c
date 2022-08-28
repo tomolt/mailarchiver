@@ -16,7 +16,7 @@ add_to_log(const char *info[])
 {
 	struct stat meta;
 	int fd, i;
-	if ((fd = open("log", O_WRONLY | O_APPEND)) < 0)
+	if ((fd = open("log", O_WRONLY | O_APPEND | O_CREAT, 0640)) < 0)
 		die("cannot open central log file.");
 	if (fstat(fd, &meta) < 0)
 		die("fstat():");
