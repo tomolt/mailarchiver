@@ -8,4 +8,4 @@ Currently, it is a work-in-progress.
 Usage
 -----
 
-See `smak-readmsg(1)`.
+See `smak(1)`.
