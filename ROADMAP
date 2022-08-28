@@ -3,29 +3,29 @@
 This document is intended to serve as a rough overview of what needs to be done.
 Feel free to deviate from it for any reason.
 
-## v0.3
-- Option to rescan cur/.
-- Generating an index site. Can be a separate executable reading from a cache file.
-
 ## v0.4
-- Stricter interpretation of some mail header fields.
-- Thread navigation on index site.
-- Convert ISO 8859-1 and Windows-1251 to UTF-8.
-  (Both encodings occur occasionally on the suckless mailing lists)
+- Generate index-sites per month.
+  Messages on the sites are ordered by date in a simple table.
 
 ## v0.5
-- Parse & understand MIME. Separate mail bodies from attachments.
-  Write out attachments separately.
-- Thread navigation on each mail HTML site.
-  If the parent mail hasn't arrived yet (reversed order),
-  push the current mail back / let it stay in new/ temporarily.
-  (But when to give up on it?)
+- Properly parse Message-IDs and From: fields with tokenize().
+- Add thread navigation bar to the mail printouts.
+- Use iconv() if needed (and available) to convert to UTF-8.
 
 ## v0.6
-- Split index site into multiple pages. Either per-month or by fixed number of mails
-  per page.
-- View per date?
-- View per author?
+- Parse & understand MIME. Separate mail bodies from attachments.
+  Write out attachments separately.
+
+## v0.7
+- Thread navigation on each mail HTML site.
+  What do we do if the parent mail hasn't arrived yet (reversed order)?
+  Perhaps push the current mail back / let it stay in new/ temporarily.
+  (But when to give up on it?)
+
+## v0.8
+- Option to rescan cur/.
+- Generate a site per-author.
+- Generate overview site listing all the per-month sites.
 
 ## v1.0
 Goal: As-good as hypermail for the purposes of the suckless mailing lists.
