@@ -12,6 +12,7 @@
  * Every time whead is incremented, rhead is also moved by at least one byte.
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 
@@ -304,22 +305,20 @@ decode_encwords(char *str)
 }
 
 static bool
-read_decimal(const char *atom, int ndigits, int *value)
+read_decimal(const char *atom, int min, int max, int *value)
 {
-	int d;
-	*value = 0;
-	for (d = 0; d < ndigits; d++) {
-		if (!(atom[d] >= '0' && atom[d] <= '9')) return false;
-		*value *= 10;
-		*value += atom[d] - '0';
-	}
-	return atom[d] == '\0';
+	char *end;
+	long lvalue = strtol(atom, &end, 10);
+	if (*end || lvalue < (long) min || lvalue > (long) max)
+		return false;
+	*value = (int) lvalue;
+	return true;
 }
 
 static bool
-parse_decimal(struct token *tok, int ndigits, int *value)
+parse_decimal(struct token *tok, int min, int max, int *value)
 {
-	return tokenize(tok) == TOKEN_ATOM && read_decimal(tok->atom, ndigits, value);
+	return tokenize(tok) == TOKEN_ATOM && read_decimal(tok->atom, min, max, value);
 }
 
 bool
@@ -330,7 +329,6 @@ parse_date(char *date, struct tm *tm)
 		"Jul", "Aug", "Sep", "Oct", "Nov", "Dec" };
 	struct token tok = TOKEN_INIT(date);
 	int zone;
-	bool neg = false;
 	
 	/* skip over weekday name if present */
 	if (tokenize(&tok) != TOKEN_ATOM) return false;
@@ -340,32 +338,27 @@ parse_date(char *date, struct tm *tm)
 	}
 
 	/* day, month, year */
-	if (!read_decimal(tok.atom, 2, &tm->tm_mday)) return false;
+	if (!read_decimal(tok.atom, 1, 31, &tm->tm_mday)) return false;
 	if (tokenize(&tok) != TOKEN_ATOM) return false;
 	for (tm->tm_mon = 0; tm->tm_mon < 12; tm->tm_mon++) {
 		if (!strcasecmp(tok.atom, months[tm->tm_mon])) break;
 	}
 	if (tm->tm_mon == 12) return false;
-	if (!parse_decimal(&tok, 4, &tm->tm_year)) return false;
+	if (!parse_decimal(&tok, 1900, 9999, &tm->tm_year)) return false;
 	tm->tm_year -= 1900;
 
 	/* hour, minute */
-	if (!parse_decimal(&tok, 2, &tm->tm_hour)) return false;
+	if (!parse_decimal(&tok, 0, 59, &tm->tm_hour)) return false;
 	if (tokenize(&tok) != ':') return false;
-	if (!parse_decimal(&tok, 2, &tm->tm_min)) return false;
+	if (!parse_decimal(&tok, 0, 59, &tm->tm_min)) return false;
 	
 	/* second (optional) */
 	if (tokenize(&tok) == ':') {
-		if (!parse_decimal(&tok, 2, &tm->tm_sec)) return false;
+		/* max is 60 because of leap seconds */
+		if (!parse_decimal(&tok, 0, 60, &tm->tm_sec)) return false;
 	}
 
-	if (tokenize(&tok) != TOKEN_ATOM) return false;
-	switch (tok.atom[0]) {
-	case '-': neg = true; /* fallthrough */
-	case '+': tok.atom++;
-	}
-	if (!read_decimal(tok.atom, 4, &zone)) return false;
-	if (neg) zone = -zone;
+	if (!parse_decimal(&tok, -9999, 9999, &zone)) return false;
 	tm->tm_hour -= zone / 100;
 	tm->tm_min  -= zone % 100;
 
