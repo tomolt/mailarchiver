@@ -3,7 +3,7 @@
 include config.mk
 
 BIN = smak
-SRC = $(addsuffix .c,$(BIN)) html.c log.c mail.c util.c
+SRC = $(addsuffix .c,$(BIN)) html.c mail.c smakdir.c util.c
 OBJ = ${SRC:.c=.o}
 MAN = $(addsuffix .1,$(BIN))
 
@@ -30,7 +30,7 @@ uninstall:
 		rm -f "$(DESTDIR)$(MANPREFIX)/man1/$b.1"	\
 	done
 
-smak: smak.o html.o log.o mail.o util.o
+smak: smak.o html.o mail.o smakdir.o util.o
 	$(LD) $(LDFLAGS) -o $@ $^
 
 .c.o:
@@ -44,6 +44,6 @@ $(OBJ): config.mk
 html.o: util.h
 mail.o: mail.h
 util.o: util.h
-log.o: smakdir.h util.h
+smakdir.o: smakdir.h util.h
 smak.o: arg.h config.h mail.h util.h
 
