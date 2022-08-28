@@ -26,8 +26,8 @@
 
 char *argv0;
 
-static char *aether_base;
-static char *aether_cursor;
+char *aether_base;
+char *aether_cursor;
 
 /* tenc = transfer encoding: \0=raw, Q=quoted-printable, B=base64 */
 bool
@@ -150,7 +150,7 @@ process_msg(const char *msgpath, const char *uniq)
 
 	text = mmap(NULL, meta.st_size, PROT_READ | PROT_WRITE, MAP_PRIVATE, fd, 0);
 	if (text == MAP_FAILED)
-		die("mmap:");
+		die("mmap():");
 	close(fd);
 
 	if (!split_header_from_body(text, meta.st_size, &body))

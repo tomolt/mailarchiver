@@ -9,9 +9,13 @@
 
 #include "util.h"
 #include "smakdir.h"
+#include "config.h"
 
-//static char *log_mem;
-//static size_t log_length;
+extern char *aether_base;
+extern char *aether_cursor;
+
+static char  *log_base;
+static size_t log_length;
 
 void
 init_smakdir(void)
@@ -45,17 +49,58 @@ add_to_log(const char *info[])
 	return meta.st_size;
 }
 
-#if 0
-map_log()
+void
+map_log(void)
 {
+	struct stat meta;
+	int fd;
+
+	if ((fd = open("smak/log", O_RDONLY)) < 0)
+		die("cannot open central log:");
+	if (fstat(fd, &meta) < 0)
+		die("cannot stat central log:");
+
+	log_base = mmap(NULL, meta.st_size, PROT_READ, MAP_SHARED, fd, 0);
+	if (log_base == MAP_FAILED)
+		die("mmap():");
+	log_length = meta.st_size;
+
+	close(fd);
 }
 
-unmap_log()
+void
+unmap_log(void)
 {
+	munmap(log_base, log_length);
 }
 
-read_from_log(char *info[])
+static void *
+aether_alloc(size_t size)
 {
+	void *ptr = aether_cursor;
+	if (size > MAX_AETHER_MEMORY - (aether_cursor - aether_base))
+		die("not enough aether memory.");
+	aether_cursor += size;
+	return ptr;
 }
-#endif
+
+void
+read_from_log(MSG msg, const char *info[])
+{
+	char *cursor = log_base + msg;
+	char *end, *buf;
+	int i;
+	for (i = 0; i < MNUMINFO; i++) {
+		end = memchr(cursor,
+			i == MNUMINFO-1 ? '\n' : '\t',
+			log_length - (cursor - log_base));
+		if (!end)
+			die("central log file is corrupt.");
+		buf = aether_alloc(end - cursor + 1);
+		memcpy(buf, cursor, end - cursor);
+		buf[end - cursor] = '\0';
+		info[i] = buf;
+		cursor = end + 1;
+	}
+}
 
