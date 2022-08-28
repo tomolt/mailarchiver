@@ -245,6 +245,8 @@ main(int argc, char **argv)
 	aether_base = mmap(NULL, MAX_AETHER_MEMORY, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	aether_cursor = aether_base;
 
+	init_smakdir();
+
 	if (stat("www", &meta) < 0 || !S_ISDIR(meta.st_mode))
 		die("You need to create or link a 'www/' subdirectory.");
 
