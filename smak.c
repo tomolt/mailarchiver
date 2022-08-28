@@ -206,6 +206,9 @@ process_new_dir(void)
 				die("file path is too long.");
 		}
 		rename(newpath, curpath);
+
+		/* clear aether after every message */
+		aether_cursor = aether_base;
 	}
 	if (errno)
 		die("readdir():");
