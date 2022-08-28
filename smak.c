@@ -19,12 +19,11 @@
 
 #include "arg.h"
 #include "mail.h"
-#include "encode.h"
 #include "util.h"
 #include "smakdir.h"
-
-#define CONFIG_HTML
 #include "config.h"
+
+extern void generate_html(const char *uniq, const char *info[], char *body, size_t length);
 
 char *argv0;
 
@@ -84,45 +83,6 @@ process_header(char *header, const char *info[], char *tenc)
 		}
 	}
 	return true;
-}
-
-void
-generate_html(const char *uniq, const char *info[], char *body, size_t length)
-{
-	char tmppath[MAX_FILENAME_LENGTH];
-	char wwwpath[MAX_FILENAME_LENGTH];
-	time_t time;
-	char date[100];
-	int fd;
-
-	strcpy(tmppath, "tmp_www_XXXXXX");
-	if ((fd = mkstemp(tmppath)) < 0)
-		die("cannot create temporary file:");
-	if (chmod(tmppath, 0640) < 0)
-		die("chmod():");
-	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%s.html", uniq) >= MAX_FILENAME_LENGTH)
-		die("file path is too long.");
-
-	time = atoll(info[MTIME]);
-	strftime(date, sizeof date, "%Y-%m-%d %T", gmtime(&time));
-
-	dprintf(fd, "%s", html_header1);
-	encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
-	dprintf(fd, "%s", html_header2);
-	dprintf(fd, "<h1>");
-	encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
-	dprintf(fd, "</h1>\n");
-	dprintf(fd, "<b>From:</b> ");
-	encode_html(fd, info[MFROM], strlen(info[MFROM]));
-	dprintf(fd, "<br/>\n<b>Date:</b> ");
-	encode_html(fd, date, strlen(date));
-	dprintf(fd, "<br/>\n<hr/>\n<pre>");
-	encode_html(fd, body, length);
-	dprintf(fd, "</pre>\n%s", html_footer);
-
-	close(fd);
-	if (rename(tmppath, wwwpath) < 0)
-		die("rename():");
 }
 
 bool
