@@ -1,5 +1,7 @@
 /* See LICENSE file for copyright and license details. */
 
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include <fcntl.h>
@@ -104,3 +106,53 @@ read_from_log(MSG msg, const char *info[])
 	}
 }
 
+void
+read_report(struct report *rpt, int year, int month)
+{
+	char filename[100];
+	struct stat meta;
+	rpt->year = year;
+	rpt->month = month;
+	snprintf(filename, sizeof filename,
+		"smak/report/%04d-%02d", year, month);
+	if ((rpt->fd = open(filename, O_RDWR | O_CREAT, 0640)) < 0)
+		die("open():");
+	if (fstat(rpt->fd, &meta) < 0)
+		die("fstat():");
+	if (!(rpt->entries = malloc(meta.st_size)))
+		die("malloc():");
+	check_read(rpt->fd, rpt->entries, meta.st_size);
+	rpt->count = meta.st_size / sizeof *rpt->entries;
+}
+
+void
+write_report(const struct report *rpt)
+{
+	lseek(rpt->fd, 0, SEEK_SET);
+	check_write(rpt->fd, rpt->entries, rpt->count * sizeof *rpt->entries);
+}
+
+void
+close_report(struct report *rpt)
+{
+	free(rpt->entries);
+	close(rpt->fd);
+}
+
+void
+add_to_report(struct report *rpt, time_t time, MSG msg)
+{
+	size_t idx;
+
+	rpt->count++;
+	if (!(rpt->entries = realloc(rpt->entries, rpt->count * sizeof *rpt->entries)))
+		die("realloc():");
+
+	for (idx = 0; idx < rpt->count; idx++) {
+		if (rpt->entries[idx].time > time) break;
+	}
+	memmove(&rpt->entries[idx + 1], &rpt->entries[idx],
+		(rpt->count - idx) * sizeof *rpt->entries);
+	rpt->entries[idx] = (struct repent) { time, msg };
+}
+ 
