@@ -98,7 +98,7 @@ process_msg(const char *msgpath, const char *uniq)
 	char tenc;
 
 	memset(info, 0, sizeof info);
-	info[MUNIQ] = msgpath;
+	info[MUNIQ] = uniq;
 	info[MSUBJECT] = "(no subject)";
 	info[MFROM] = "(no sender)";
 	info[MMSGID] = "";
@@ -146,7 +146,7 @@ process_msg(const char *msgpath, const char *uniq)
 
 	/* TODO generate reports later on; only regenerate dirty reports once; only map log once. */
 	map_log();
-	read_report(&rpt, tm->tm_year, tm->tm_mon);
+	read_report(&rpt, tm->tm_year + 1900, tm->tm_mon + 1);
 	add_to_report(&rpt, time, msg);
 	write_report(&rpt);
 	generate_html_report(&rpt);
@@ -162,8 +162,10 @@ process_new_dir(void)
 {
 	DIR *dir;
 	struct dirent *ent;
+	char uniq[MAX_FILENAME_LENGTH];
 	char newpath[MAX_FILENAME_LENGTH];
 	char curpath[MAX_FILENAME_LENGTH];
+	char *colon;
 
 	if (!(dir = opendir("new")))
 		die("cannot open directory 'new':");
@@ -172,13 +174,22 @@ process_new_dir(void)
 		if (!strcmp(ent->d_name, ".") || !strcmp(ent->d_name, ".."))
 			continue;
 
+		colon = strrchr(ent->d_name, ':');
+		if (colon) {
+			/* FIXME potential buffer overrun */
+			memcpy(uniq, ent->d_name, colon - ent->d_name);
+		} else {
+			/* FIXME snprintf() is overkill */
+			snprintf(uniq, MAX_FILENAME_LENGTH, "%s", ent->d_name);
+		}
+
 		if (snprintf(newpath, MAX_FILENAME_LENGTH, "new/%s", ent->d_name) >= MAX_FILENAME_LENGTH)
 			die("file path is too long.");
-		if (process_msg(newpath, ent->d_name)) {
-			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,a", ent->d_name) >= MAX_FILENAME_LENGTH)
+		if (process_msg(newpath, uniq)) {
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,a", uniq) >= MAX_FILENAME_LENGTH)
 				die("file path is too long.");
 		} else {
-			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,e", ent->d_name) >= MAX_FILENAME_LENGTH)
+			if (snprintf(curpath, MAX_FILENAME_LENGTH, "cur/%s:2,e", uniq) >= MAX_FILENAME_LENGTH)
 				die("file path is too long.");
 		}
 		rename(newpath, curpath);
