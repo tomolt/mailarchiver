@@ -3,10 +3,6 @@
 This document is intended to serve as a rough overview of what needs to be done.
 Feel free to deviate from it for any reason.
 
-## v0.4
-- Generate index-sites per month.
-  Messages on the sites are ordered by date in a simple table.
-
 ## v0.5
 - Properly parse Message-IDs and From: fields with tokenize().
 - Add thread navigation bar to the mail printouts.
