@@ -99,6 +99,9 @@ generate_html_report(const struct report *rpt)
 	size_t i;
 	MSG msg;
 	char *aether_checkpoint;
+	time_t time;
+	struct tm *tm;
+	char date[200];
 
 	strcpy(tmppath, "tmp_www_XXXXXX");
 	if ((fd = mkstemp(tmppath)) < 0)
@@ -110,15 +113,22 @@ generate_html_report(const struct report *rpt)
 
 	dprintf(fd, "%s%04d-%02d", html_header1, rpt->year, rpt->month);
 	dprintf(fd, "%s\n<table>\n", html_header2);
-	for (i = 0; i < rpt->count; i++) {
+	dprintf(fd, "<tr>\n<th>Date</th>\n<th>Subject</th>\n<th>Author</th>\n</tr>\n");
+	for (i = rpt->count; i--;) { /* count backwards so newest msgs are on top */
 		aether_checkpoint = aether_cursor;
 
 		msg = rpt->entries[i].msg;
 		read_from_log(msg, info);
 
-		dprintf(fd, "<tr>\n<td>");
+		time = atoll(info[MTIME]);
+		tm = gmtime(&time);
+		strftime(date, sizeof date, "%Y-%m-%d %T", tm);
+
+		dprintf(fd, "<tr>\n<td>%s", date);
+		dprintf(fd, "</td>\n<td><a href=\"");
+		dprintf(fd, "%s.html\">", info[MUNIQ]);
 		encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
-		dprintf(fd, "</td>\n<td>");
+		dprintf(fd, "</a></td>\n<td>");
 		encode_html(fd, info[MFROM], strlen(info[MFROM]));
 		dprintf(fd, "</td>\n</tr>\n");
 
