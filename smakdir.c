@@ -29,6 +29,8 @@ init_smakdir(void)
 
 	if (mkdir("smak", 0750) < 0)
 		die("mkdir():");
+	if (mkdir("smak/report", 0750) < 0)
+		die("mkdir():");
 }
 
 size_t
@@ -144,8 +146,7 @@ add_to_report(struct report *rpt, time_t time, MSG msg)
 {
 	size_t idx;
 
-	rpt->count++;
-	if (!(rpt->entries = realloc(rpt->entries, rpt->count * sizeof *rpt->entries)))
+	if (!(rpt->entries = realloc(rpt->entries, (rpt->count + 1) * sizeof *rpt->entries)))
 		die("realloc():");
 
 	for (idx = 0; idx < rpt->count; idx++) {
@@ -154,5 +155,6 @@ add_to_report(struct report *rpt, time_t time, MSG msg)
 	memmove(&rpt->entries[idx + 1], &rpt->entries[idx],
 		(rpt->count - idx) * sizeof *rpt->entries);
 	rpt->entries[idx] = (struct repent) { time, msg };
+	rpt->count++;
 }
  

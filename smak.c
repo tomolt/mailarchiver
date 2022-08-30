@@ -24,6 +24,7 @@
 #include "config.h"
 
 extern void generate_html(const char *uniq, const char *info[], char *body, size_t length);
+extern void generate_html_report(const struct report *rpt);
 
 char *argv0;
 
@@ -137,7 +138,20 @@ process_msg(const char *msgpath, const char *uniq)
 	}
 
 	generate_html(uniq, info, body, length);
-	add_to_log(info);
+	MSG msg = add_to_log(info);
+
+	time_t time = atoll(info[MTIME]);
+	struct tm *tm = gmtime(&time);
+	struct report rpt;
+
+	/* TODO generate reports later on; only regenerate dirty reports once; only map log once. */
+	map_log();
+	read_report(&rpt, tm->tm_year, tm->tm_mon);
+	add_to_report(&rpt, time, msg);
+	write_report(&rpt);
+	generate_html_report(&rpt);
+	close_report(&rpt);
+	unmap_log();
 
 	munmap(text, meta.st_size);
 	return true;

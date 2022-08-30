@@ -14,6 +14,9 @@
 #define CONFIG_HTML
 #include "config.h"
 
+extern char *aether_base;
+extern char *aether_cursor;
+
 static void
 encode_html(int fd, const char *mem, size_t length)
 {
@@ -80,6 +83,48 @@ generate_html(const char *uniq, const char *info[], char *body, size_t length)
 	dprintf(fd, "<br/>\n<hr/>\n<pre>");
 	encode_html(fd, body, length);
 	dprintf(fd, "</pre>\n%s", html_footer);
+
+	close(fd);
+	if (rename(tmppath, wwwpath) < 0)
+		die("rename():");
+}
+
+void
+generate_html_report(const struct report *rpt)
+{
+	char tmppath[MAX_FILENAME_LENGTH];
+	char wwwpath[MAX_FILENAME_LENGTH];
+	const char *info[MNUMINFO];
+	int fd;
+	size_t i;
+	MSG msg;
+	char *aether_checkpoint;
+
+	strcpy(tmppath, "tmp_www_XXXXXX");
+	if ((fd = mkstemp(tmppath)) < 0)
+		die("cannot create temporary file:");
+	if (chmod(tmppath, 0640) < 0)
+		die("chmod():");
+	if (snprintf(wwwpath, MAX_FILENAME_LENGTH, "www/%04d-%02d.html", rpt->year, rpt->month) >= MAX_FILENAME_LENGTH)
+		die("file path is too long.");
+
+	dprintf(fd, "%s%04d-%02d", html_header1, rpt->year, rpt->month);
+	dprintf(fd, "%s\n<table>\n", html_header2);
+	for (i = 0; i < rpt->count; i++) {
+		aether_checkpoint = aether_cursor;
+
+		msg = rpt->entries[i].msg;
+		read_from_log(msg, info);
+
+		dprintf(fd, "<tr>\n<td>");
+		encode_html(fd, info[MSUBJECT], strlen(info[MSUBJECT]));
+		dprintf(fd, "</td>\n<td>");
+		encode_html(fd, info[MFROM], strlen(info[MFROM]));
+		dprintf(fd, "</td>\n</tr>\n");
+
+		aether_cursor = aether_checkpoint;
+	}
+	dprintf(fd, "</table>\n%s", html_footer);
 
 	close(fd);
 	if (rename(tmppath, wwwpath) < 0)
