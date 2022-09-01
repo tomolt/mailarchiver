@@ -5,7 +5,6 @@ Feel free to deviate from it for any reason.
 
 ## v0.5
 - Properly parse Message-IDs and From: fields with tokenize().
-- Add thread navigation bar to the mail printouts.
 - Use iconv() if needed (and available) to convert to UTF-8.
 
 ## v0.6
