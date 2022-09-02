@@ -3,8 +3,17 @@
 This document is intended to serve as a rough overview of what needs to be done.
 Feel free to deviate from it for any reason.
 
+## Do whenever
+- Put files in www/ directory into subdirs to avoid filename collisions.
+- Mangle e-mail addresses so that web scrapers won't recognize them.
+- Properly track the set of files that have to be regenerated.
+- Properly parse Message-IDs and From: fields.
+- Option to rescan cur/.
+- Massage HTML output so it's easier to style with CSS? (i.e. use classes, ids, etc.)
+- Split project into multiple separate executables?
+- Make cache file structure independent of system architecure? (meaning enforce byteorder etc.)
+
 ## v0.5
-- Properly parse Message-IDs and From: fields with tokenize().
 - Use iconv() if needed (and available) to convert to UTF-8.
 
 ## v0.6
@@ -18,12 +27,11 @@ Feel free to deviate from it for any reason.
   (But when to give up on it?)
 
 ## v0.8
-- Option to rescan cur/.
 - Generate a site per-author.
 - Generate overview site listing all the per-month sites.
 
 ## v1.0
-Goal: As-good as hypermail for the purposes of the suckless mailing lists.
+*Goal:* As-good as hypermail for the purposes of the suckless mailing lists.
 (Does not mean feature parity, just overall usability should be about the same!)
 
 ## after v1.0
