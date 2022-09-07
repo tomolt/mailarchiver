@@ -260,13 +260,37 @@ decode_base64(char *rhead, char *whead, size_t length)
 	return whead;
 }
 
+char *
+decode_encword(char *rhead, char *whead, size_t length)
+{
+	char *start = rhead, *mark, *c;
+	char enc;
+
+	if (!(mark = strchr(rhead, '?'))) return NULL;
+	rhead = mark + 1;
+
+	enc = *rhead++;
+	if (*rhead != '?') return NULL;
+	rhead++;
+
+	if (enc == 'Q' || enc == 'q') {
+		for (c = rhead; c < mark; c++) {
+			if (*c == '_') *c = ' ';
+		}
+		return decode_qprintable(rhead, whead, length - (rhead - start));
+	} else if (enc == 'B' || enc == 'b') {
+		return decode_base64(rhead, whead, length - (rhead - start));
+	} else {
+		return NULL;
+	}
+}
+
 /* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
  * that may appear in header fields. See RFC 2047. */
 bool
 decode_encwords(char *str)
 {
-	char *rhead, *whead, *mark, *c;
-	char encoding;
+	char *rhead, *whead, *mark;
 
 	rhead = whead = str;
 	while ((mark = strstr(rhead, "=?"))) {
@@ -274,28 +298,9 @@ decode_encwords(char *str)
 		whead += mark - rhead;
 		rhead = mark + 2;
 
-		if (!(mark = strchr(rhead, '?'))) return false;
-		rhead = mark + 1;
-
-		if (*rhead != 'Q' && *rhead != 'q' && *rhead != 'B' && *rhead != 'b') return false;
-		encoding = *rhead++;
-		if (*rhead != '?') return false;
-		rhead++;
-
-		if (!(mark = strchr(rhead, '?'))) return false;
-		if (mark[1] != '=') return false;
-
-		if (encoding == 'Q' || encoding == 'q') {
-			for (c = rhead; c < mark; c++) {
-				if (*c == '_') *c = ' ';
-			}
-			whead = decode_qprintable(rhead, whead, mark - rhead);
-			if (!whead) return false;
-		} else {
-			whead = decode_base64(rhead, whead, mark - rhead);
-			if (!whead) return false;
-		}
-
+		if (!(mark = strstr(rhead, "?="))) return false;
+		whead = decode_encword(rhead, whead, mark - rhead);
+		if (!whead) return false;
 		rhead = mark + 2;
 	}
 	memmove(whead, rhead, strlen(rhead));
