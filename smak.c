@@ -176,6 +176,7 @@ process_new_dir(void)
 		if (colon) {
 			/* FIXME potential buffer overrun */
 			memcpy(uniq, ent->d_name, colon - ent->d_name);
+			uniq[colon - ent->d_name] = '\0';
 		} else {
 			/* FIXME snprintf() is overkill */
 			snprintf(uniq, MAX_FILENAME_LENGTH, "%s", ent->d_name);
