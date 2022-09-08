@@ -26,9 +26,11 @@ int tokenize(struct token *token);
 
 char *decode_qprintable(char *rhead, char *whead, size_t length);
 char *decode_base64(char *rhead, char *whead, size_t length);
-/* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
- * that may appear in header fields. See RFC 2047. */
-bool decode_encwords(char *str);
+char *decode_encword(char *rhead, char *whead, size_t length);
+/* Convert any 'Encoded Words' of the form =?charset?encoding?content?=
+ * that may appear in header fields to UTF-8. See RFC 2047.
+ * The resulting string is allocated in the aether memory. */
+char *convert_encwords(char *str);
 
 bool parse_date(char *date, struct tm *tm);
 

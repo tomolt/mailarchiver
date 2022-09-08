@@ -35,7 +35,7 @@ char *aether_cursor;
 bool
 process_header(char *header, const char *info[], char *tenc)
 {
-	char *key, *value;
+	char *key, *value, *str;
 	struct token token;
 	struct tm tm;
 
@@ -45,12 +45,12 @@ process_header(char *header, const char *info[], char *tenc)
 			return false;
 		if (!strcasecmp(key, "From")) {
 			collapse_ws(value);
-			if (!decode_encwords(value)) return false;
-			info[MFROM] = value;
+			if (!(str = convert_encwords(value))) return false;
+			info[MFROM] = str;
 		} else if (!strcasecmp(key, "Subject")) {
 			collapse_ws(value);
-			if (!decode_encwords(value)) return false;
-			info[MSUBJECT] = value;
+			if (!(str = convert_encwords(value))) return false;
+			info[MSUBJECT] = str;
 		} else if (!strcasecmp(key, "Date")) {
 			if (!parse_date(value, &tm)) return false;
 			if (aether_cursor - aether_base + 32 > MAX_AETHER_MEMORY)
@@ -59,11 +59,9 @@ process_header(char *header, const char *info[], char *tenc)
 			info[MTIME] = aether_cursor;
 		} else if (!strcasecmp(key, "Message-ID")) {
 			collapse_ws(value);
-			if (!decode_encwords(value)) return false;
 			info[MMSGID] = value;
 		} else if (!strcasecmp(key, "In-Reply-To")) {
 			collapse_ws(value);
-			if (!decode_encwords(value)) return false;
 			info[MINREPLYTO] = value;
 		} else if (!strcasecmp(key, "Content-Transfer-Encoding")) {
 			token = TOKEN_INIT(value);

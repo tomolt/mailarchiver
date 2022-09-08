@@ -15,9 +15,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <iconv.h>
 
 #include "mail.h"
 #include "util.h"
+#include "config.h"
+
+extern char *aether_base;
+extern char *aether_cursor;
 
 static inline bool
 is_ws(char c)
@@ -285,28 +290,41 @@ decode_encword(char *rhead, char *whead, size_t length)
 	}
 }
 
-/* Decode any 'Encoded Words' of the form =?charset?encoding?content?=
- * that may appear in header fields. See RFC 2047. */
-bool
-decode_encwords(char *str)
+/* Convert any 'Encoded Words' of the form =?charset?encoding?content?=
+ * that may appear in header fields to UTF-8. See RFC 2047.
+ * The resulting string is allocated in the aether memory. */
+char *
+convert_encwords(char *str)
 {
-	char *rhead, *whead, *mark;
+	char *output, *rhead, *whead, *mark;
+	size_t length;
 
-	rhead = whead = str;
+	rhead = str;
+	whead = output = aether_cursor;
 	while ((mark = strstr(rhead, "=?"))) {
-		memmove(whead, rhead, mark - rhead);
-		whead += mark - rhead;
+		length = mark - rhead;
+		if (MAX_AETHER_MEMORY - (whead - aether_base) < length)
+			return NULL;
+		memcpy(whead, rhead, length);
+		whead += length;
 		rhead = mark + 2;
 
-		if (!(mark = strstr(rhead, "?="))) return false;
-		whead = decode_encword(rhead, whead, mark - rhead);
-		if (!whead) return false;
+		if (!(mark = strstr(rhead, "?="))) return NULL;
+		length = mark - rhead;
+		if (MAX_AETHER_MEMORY - (whead - aether_base) < length)
+			return NULL;
+		whead = decode_encword(rhead, whead, length);
+		if (!whead) return NULL;
 		rhead = mark + 2;
 	}
-	memmove(whead, rhead, strlen(rhead));
-	whead += strlen(rhead);
-	*whead = '\0';
-	return true;
+	length = strlen(rhead);
+	if (MAX_AETHER_MEMORY - (whead - aether_base) < length + 1)
+		return NULL;
+	memcpy(whead, rhead, length);
+	whead[length] = '\0';
+	whead += length + 1;
+	aether_cursor = whead;
+	return output;
 }
 
 static bool
